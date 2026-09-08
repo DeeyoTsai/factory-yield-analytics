@@ -1,1 +1,37 @@
+# dependencies
+node_modules/
+/client/node_modules/
+/server/node_modules/
+
+# env
+.env
+.env.local
+*.env
+!.env.example
+
+# build
+/client/build/
+/client/dist/
+
+# logs
+*.log
+/server/logs/
+npm-debug.log*
+
+# runtime / uploads
+/server/uploads/
+/client/media/
+
+# python (ml/)
+ml/venv/
+ml/__pycache__/
+ml/**/__pycache__/
+*.pyc
+ml/weights/
+*.pt
+
+# os / editor
 .DS_Store
+.idea/
+.vscode/
+coverage/

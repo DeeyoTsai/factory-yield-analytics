@@ -26,7 +26,7 @@ repo：沿用現有 public repo `factory-yield-analytics`，**不帶任何私有
 | 項目 | 決策 |
 |---|---|
 | 授權 | MIT |
-| 語言 | 文件與 README 繁中為主；專有詞／不確定的術語保留英文，不硬翻；程式碼註解維持繁中，就地清理 AUO specifics |
+| 語言 | 文件與 README 繁中為主；專有詞／不確定的術語保留英文，不硬翻；程式碼註解維持繁中，就地清理原公司／廠區相關內容 |
 | 啟動方式 | npm scripts + 手動裝 MySQL/MariaDB（暫不做 docker-compose） |
 | 權限系統 | 保留「工號數字 → 部門 → 權限層級」機制；部門對照抽成 `server/config/departments.js`，部門名泛用（`QA / IQC / PROD / ENG / MGMT`） |
 | YOLO | 附整合程式碼 + 可插拔 detector 介面 + mock detector（回固定 detection）+ Python 推論骨架（FastAPI，`ml/`，標 optional）；**不附**權重、**不附** FTP daemon |
@@ -36,7 +36,7 @@ repo：沿用現有 public repo `factory-yield-analytics`，**不帶任何私有
 | CI | GitHub Actions 跑去識別化 grep gate，命中禁區關鍵字即 fail |
 | 舊檔 | 刪掉 `factory-yield-analytics/` 現有的靜態仿製首頁（`index.html` / `styles.css` / `app.js`） |
 | FTP | 只在 `docs/` 寫概念 + 留 adapter 接點，不寫任何 FTP client 程式碼 |
-| 資料匯入 | ingestion adapter 介面 + `seedAdapter`（可運作）；AUO 爬蟲零程式碼進 repo |
+| 資料匯入 | ingestion adapter 介面 + `seedAdapter`（可運作）；原系統爬蟲零程式碼進 repo |
 | DB schema | 靠 `sequelize.sync()` 建表，不引入 migration 框架 |
 | 分支 | 新 repo 只用 `main` |
 | 規劃文件 | 放 `factory-yield-analytics/docs/dev/`；私有 repo 的 `SHOWCASE_LANDING_PAGE.md` 改成一行指標 |
@@ -115,8 +115,8 @@ factory-yield-analytics/
 
 **server —— 刪除（不進 repo）**
 - `crawler/yieldCrawl-claude.js` `edcCrawl.js` `edcCrawlRunner.js` `rgbYieldCrawler.js` `hourlyDefectCrawler.js` `testPuppeteer.js`
-- `crawler/edcTuning.js` `edcTuning.output.html` `edc_form_debug_ELRED1.html` `edc.status.json` `CHANGELOG.md`
-- `crawler/__fixtures__/edcElred2Sample.json`（真實量產資料）
+- `crawler/edcTuning.js` + 其輸出 HTML、EDC 表單 debug HTML、`edc.status.json`、`CHANGELOG.md`
+- `crawler/__fixtures__/` 內的 EDC 真實樣本 JSON（真實量產資料）
 - `crawler/logs/` `logs/` `tests/`（stub）
 
 **server —— 依賴移除**：`puppeteer` `playwright` `cheerio` `xlsx`（皆爬蟲／匯出專用，資料源改走 adapter，全部移除）。
@@ -155,18 +155,25 @@ nav（`nav-component.js`）：移除延後項的連結；登入頁加「以 Demo
 
 ### 4.4 去識別化執行流程
 
-1. 依 **附錄 A** 的替換對照表建 sed 腳本。
-2. 一次搬一個子系統 → 跑 sed → **逐檔完整人工複審** → 該檔 commit。
-3. `.github/workflows/deidentify-gate.yml`：對全 repo 跑 grep gate（附錄 A 的禁區 pattern），命中即 fail。作為回歸防線，不取代人工複審。
-4. 每個進 repo 的檔案 commit 前都由我完整讀過一次。
+去識別化的**完整字面對照清單 + sed 替換腳本**是維護者的私有工具，**不隨附本 repo**
+（清單本身含真實 email／分機／密碼／型號，公開等於洩漏）。放在維護者私有環境
+`deident/`（見附錄 A 說明）。
 
-**額外要處理的去識別化熱點**（掃描時已知）：
-- `routes/img-table-route.js`：`lineCvtEq`（`R1→ERIN01`…）、讀 `ftp_exchange_data/.env` → 改讀 `server/.env`、`process.env.TRAINED_WEIGHT` 路徑
-- `contexts/DashboardContext.js`：`transDefect` / `labeledDefect` 兩張真實 defect 類名對照表（連同 YOLO class 名一起泛化）
-- `utils/employeeValidation.js`：部門碼
-- `models/*`：註解內的 EIS/EDC/廠區用語、`unfinish_lots.stage` 等推導註解
-- `domain/edc*`：`STATION_MACHINE_PAIRS`、`erinToLine`、shot 欄位（`FRX/FRY…` 可留，值要假）
-- 前端各 view：卡片標題（`MC5EP2 Daily Yield` → `工廠 Daily Yield`、`RGB未結批良率` → `未結批良率`…）
+1. 依私有 `deident/scrub.sed` 對搬過來的檔案跑自動替換。
+2. 一次搬一個子系統 → 跑 sed → **逐檔完整人工複審** → 該檔 commit。
+3. `scripts/deidentify-gate.sh`（+ `.github/workflows/deidentify-gate.yml`）：**結構型** gate，
+   只檢查格式（內網 IP、`.aspx`、UNC 路徑、硬編密碼、非公開 email），不含任何真實字串，
+   適合放公開 repo。作為回歸防線，不取代人工複審。
+4. push 到公開 repo 前，維護者在私有端對整個工作樹跑一次**完整字面清單**比對。
+5. 每個進 repo 的檔案 commit 前都由我完整讀過一次。
+
+**已知去識別化熱點**（搬到時逐一處理）：
+- `routes/img-table-route.js`：line→機台代碼硬編對照、`.env` 路徑（改讀 `server/.env`）、模型權重路徑 env
+- `contexts/DashboardContext.js`：兩張真實 defect 類名對照表（連同 YOLO class 名一起泛化為 12 類）
+- `utils/employeeValidation.js`：部門代碼
+- `models/*`：註解內的內部系統／廠區用語、欄位推導說明
+- `domain/edc*`：站別↔機台配對常數、line 對應函式、shot 欄位（四角點欄名屬通用對位量測術語可留，值要假）
+- 前端各 view：卡片標題含廠區碼、內部系統名
 
 ### 4.5 ingestion adapter（階段 1 只立骨架，契約細節留階段 4）
 
@@ -232,50 +239,46 @@ npm start                    # http://localhost:3000
 ## 5. 風險 / 待確認
 
 - **YOLO 預填端到端**：`imagetb.pred_result` 的實際 JSON 結構要從 `fma-table-element.js:470-486` 與一份真實樣本反推，寫進 mock。階段 2 處理，階段 1 先給「能填進去就好」的最小 mock。
-- **前端隱藏的內部字串**：view 元件多、字串散，靠人工複審 + gate 雙保險，仍可能漏。gate 的 pattern 要夠嚴。
+- **前端隱藏的內部字串**：view 元件多、字串散，靠人工複審 + 私有端完整清單比對 + 結構型 gate 三層防護，仍可能漏。
 - **seed 資料量 vs Pi 效能**：EDC glass record 可能上千列，seed 時間要留意（私有版實測 771 片寫入 ~5s）。
 - **`react-calendar` / `@wojtekmaj/react-daterange-picker`**：首頁日期選擇器用，保留。
 
 ---
 
-## 附錄 A：去識別化替換對照表
+## 附錄 A：去識別化 — 目標詞彙表
 
 > 版型／class／ECharts 用法一律不動，只換字串與識別性數值。
+>
+> **來源字串對照（左欄）不列在本 repo。** 完整的「原字串 → 目標字串」對照清單、
+> `deident/scrub.sed` 自動替換腳本、以及維護者 push 前跑的完整字面比對 `deident/check.sh`，
+> 都放在維護者私有環境，理由：對照清單左欄本身就是真實 email／分機／密碼／型號／
+> 內部代號的集合，放進公開 repo 等於把它們公開。
 
-### A.1 禁區（CI gate pattern，命中即 fail）
+本 repo 只記錄**去識別化後應長什麼樣**（目標詞彙），供實作與複審對齊：
 
-```
-AUO | AU Optronics | 友達 | auo\.com | corpnet | KHProxy
-10\.(31|34|88|12)\. | C5E | H14 | MC5EP2 | TNKH | CFI | DC5EM2
-ERAL0 | ELRED | ELBLU | ERIN0 | EDC_ALIGNER | DS_RECIPE_ID
-DiyouTsai | diyou\.tsai | 57-3755 | B140HAN | G190ACMB
-GXX4 | EXX4 | JYX4 | deeyo3834 | deeyo0312(除了聯絡信箱)
-埋入 | 凝膠 | 膜傷 | 昇華物 | FTP_PASS | PASSPORT_SECRET=（實值）
-```
-
-### A.2 替換
-
-| 原（禁用） | 換成 |
+| 類別 | 目標值 |
 |---|---|
-| 產線 `R1 R2 G1 G2 B1 B2` | `L1 L2 L3 L4 L5 L6` |
-| ADI `ERIN01`–`ERIN06` | `AOI-01`–`AOI-06` |
-| EDC 站別 `ELRED1`–`ELBLU2` | `站別 A`–`F` |
-| EDC 機台 `ERAL01`–`ERAL06` | `機台 M01`–`M06` |
-| 站別清單 `BM1,BM2,R1,R2,G1,G2,B1,B2,AOI` | `BM1,BM2,L1,L2,L3,L4,L5,L6,AOI` |
-| recipe 欄名 `DS_RECIPE_ID` | `recipe_id` |
-| 缺陷類名（`B_Under_particle`、`BM_WP`、`Oven液滴`、`膜上Particle`…） | 泛化為固定 **12 類**：`刮傷 異物 髒污 破損 氣泡 殘膠 膜厚異常 顯影不良 崩缺 亮點 暗點 色不均`（對外稱「支援 12 類缺陷」；code 對照鍵 `DF-01`…`DF-12`） |
-| YOLO class 名（`trained_classes.json` 原 18 類） | 對映到上述 12 類 |
-| 缺陷 code（`B-髒汙`） | `DF-01`–`DF-12` |
-| 產品型號（`G190ACMB`、`B140HAN01`） | `PNL-A140 / PNL-B156 / PNL-C238` |
+| 產線 | `L1 L2 L3 L4 L5 L6`（6 條） |
+| ADI／AOI 檢查機 | `AOI-01`–`AOI-06` |
+| 量測站別（EDC） | `站別 A`–`站別 F` |
+| 量測機台（EDC） | `機台 M01`–`機台 M06` |
+| 站別順序清單 | `BM1, BM2, L1, L2, L3, L4, L5, L6, AOI` |
+| recipe 欄位 | `recipe_id` |
+| 缺陷類別 | 固定 **12 類**：`刮傷 異物 髒污 破損 氣泡 殘膠 膜厚異常 顯影不良 崩缺 亮點 暗點 色不均`；對照鍵 `DF-01`…`DF-12`（對外稱「支援 12 類缺陷」） |
+| YOLO class | 對映到上述 12 類（`ml/classes.json`） |
+| 產品型號 | `PNL-A140 / PNL-B156 / PNL-C238` |
 | LOT 號 | `LOT-YYMMDDNN`（例 `LOT-24081201`） |
 | Glass ID | `GL-YYMMDDNN-XX`（例 `GL-24081201-05`） |
 | 工號 | `E-XXXX`（例 `E-1042`） |
-| 部門碼 `MC5EP2` 等 | `DEPT-01` ／ 泛用部門名 |
-| `MC5EP2 Daily Yield` | `工廠 Daily Yield` |
-| `RGB未結批良率` | `未結批良率` |
-| 內網 URL（EIS 明細等） | `#` / `javascript:void(0)` |
-| footer `©2025 AUO, Contact: diyou.tsai@auo.com, Tel: 57-3755` | `© 2025 · FMA 良率平台 · 開源版` |
-| shot 欄位 `FRX/FRY/FLX/FLY/RLX/RLY/RRX/RRY` | **保留**（通用對位量測術語），值要假 |
+| 部門 | `QA / IQC / PROD / ENG / MGMT`（`server/config/departments.js` 可自訂） |
+| Daily Yield 頁標題 | `工廠 Daily Yield` |
+| 未結批頁標題 | `未結批良率` |
+| 對外系統連結 | `#` / `javascript:void(0)` |
+| footer | `© 2026 · FMA 良率平台 · 開源版` |
+| 對位量測四角點欄名（`FRX/FRY/FLX/FLY/RLX/RLY/RRX/RRY`） | **保留**（通用術語），但欄位值要假 |
+
+**結構型 gate**（`scripts/deidentify-gate.sh`，公開）擋的是格式：RFC1918 內網 IP、
+`.aspx` 內部頁、Windows UNC 路徑、疑似硬編密碼、非公開網域 email。它不含任何真實字串。
 
 ---
 

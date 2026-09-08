@@ -1,0 +1,13 @@
+name: deidentify-gate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  deidentify-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run de-identification gate
+        run: bash scripts/deidentify-gate.sh
