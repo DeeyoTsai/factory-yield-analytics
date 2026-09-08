@@ -2,7 +2,6 @@ const router = require("express").Router();
 const { Op } = require("sequelize");
 const db = require("../models");
 const {
-  verifyToken,
   requirePermission,
   requireResourceOwner,
   rateLimit,
@@ -13,8 +12,7 @@ const User = db.users;
 const Fmatbs = db.fmatbs;
 const Outlines = db.outlines;
 
-// 這個 route 檔的所有端點都需要登入
-router.use(verifyToken);
+// 掛載時已套 passport JWT（見 server/index.js），req.user 由 passport 提供
 
 function isAdmin(level) {
   return level === "admin" || level === "super";
