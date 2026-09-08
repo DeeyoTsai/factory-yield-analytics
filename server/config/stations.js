@@ -14,12 +14,12 @@ const AOI_MACHINES = ["AOI-01", "AOI-02", "AOI-03", "AOI-04", "AOI-05", "AOI-06"
 
 // 量測站（EDC 全距監控）站別 ↔ 機台，固定一對一
 const EDC_STATION_MACHINE_PAIRS = [
-  ["站別 A", "機台 M01"],
-  ["站別 B", "機台 M02"],
-  ["站別 C", "機台 M03"],
-  ["站別 D", "機台 M04"],
-  ["站別 E", "機台 M05"],
-  ["站別 F", "機台 M06"],
+  ["站別A", "機台M01"],
+  ["站別B", "機台M02"],
+  ["站別C", "機台M03"],
+  ["站別D", "機台M04"],
+  ["站別E", "機台M05"],
+  ["站別F", "機台M06"],
 ];
 
 module.exports = { LINES, STATIONS, AOI_MACHINES, EDC_STATION_MACHINE_PAIRS };
