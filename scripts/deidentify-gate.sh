@@ -41,7 +41,7 @@ ALLOWLIST=(
 
 # --- email：抓所有 email，排除公開/範例網域 --------------------------------
 EMAIL_RE='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
-EMAIL_ALLOW='@(example\.(com|org)|users\.noreply\.github\.com)$|deeyo0312@gmail\.com'
+EMAIL_ALLOW='@(example\.(com|org|net)|test\.com|localhost|users\.noreply\.github\.com)([^A-Za-z0-9.-]|$)|deeyo0312@gmail\.com'
 
 SCAN_ARGS=(
   -rniE

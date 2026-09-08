@@ -1,0 +1,32 @@
+{
+  "name": "fma-yield-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FMA 良率平台（開源版）後端 — Express + Sequelize",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "seed": "node seed/seed.js",
+    "test:domain": "node domain/edcAnalysis.test.js && node domain/edcOutlier.test.js && node domain/edcShift.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dayjs": "^1.11.19",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.13.0",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "passport-local": "^1.0.0",
+    "sequelize": "^6.37.6"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}

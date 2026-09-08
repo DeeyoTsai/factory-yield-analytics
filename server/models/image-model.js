@@ -4,19 +4,18 @@ const { DataTypes } = require("sequelize");
 module.exports = (sequelize, Sequelize) => {
   const imagetb = sequelize.define("imagetb", {
     line: {
-      type: DataTypes.STRING(5),
+      type: DataTypes.STRING(10),
     },
     gid: {
-      type: DataTypes.STRING(11),
+      type: DataTypes.STRING(20),
       allowNull: false,
       validate: {
-        // min: 5,
         notNull: true,
         notEmpty: true,
       },
     },
     lot: {
-      type: DataTypes.STRING(7),
+      type: DataTypes.STRING(20),
       allowNull: false,
     },
     datetime: {

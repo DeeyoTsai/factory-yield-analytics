@@ -20,13 +20,19 @@
 - [x] `server/domain/`：`edcAnalysis` / `edcShift` / `edcStore` / `unfinishStore`（+ 3 個測試共 24 項全綠）
   - `__fixtures__/generateEdcSample.js` → 合成 EDC 樣本（取代真實 fixture）
   - `phaseProcess.js` 未搬（爬蟲耦合太深、內部站名多；日後趨勢線選擇功能再議）
-- [ ] `server/ingestion/`：`adapter.js` + `seedAdapter.js`
-- [ ] `server/controllers/` + `server/routes/`（去識別化；不接 HourlyDefect/OverShoot 路由）
-- [ ] `server/index.js`
-- [ ] `server/seed/`：`seed.js` + fixtures
-- [ ] `client/`：config / services / contexts / 核心子集元件
+- [x] `server/controllers/` + `server/routes/` 全部去識別化
+- [x] `server/routes/auth.js`、`img-table-route.js`、`fma-table-route.js`（統計改 12 類 + 依 line）
+- [x] `server/index.js`（路由掛載 / 崩潰攔截 / request log / SPA fallback）
+- [x] `server/ingestion/`：`adapter.js` 契約 + `seedAdapter.js`（Daily Yield / 未結批 / EDC / 機況 / YOLO 影像）
+- [x] `server/seed/`：`seed.js` + `rng.js` + `edcGen.js`；`npm run seed` 建表 + 灌 15 個工作日的假資料
+- [x] `server/package.json`（移除 puppeteer/playwright/cheerio/xlsx；加 seed / test:domain script）
+- [x] **server 端到端可跑**：`npm run seed` OK；`npm run dev` 啟動；API 煙霧測試（login / statistics /
+  rgbtopfive / edc summary / eq-actions / unfinish / glass-info）全部回真資料
+  - EDC 的 SPC 分段/離群分析在 seed 時實際跑過（站別A 全距 4.75 紅燈、其餘綠燈）
+- [ ] `client/`：config / services / contexts / 核心子集元件（10 畫面）
 - [ ] `ml/`：FastAPI 骨架 + mock detector + classes.json
-- [ ] 端到端跑起來 + 驗收清單（設計文件 §4.8）
+- [ ] `docs/ingestion.md`（FTP/爬蟲/直連三 pattern）
+- [ ] 前端接起來截圖驗收（設計文件 §4.8）
 
 ## 已知延後（不在階段 1）
 
