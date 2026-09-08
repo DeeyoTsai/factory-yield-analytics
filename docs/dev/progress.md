@@ -14,10 +14,12 @@
 
 ## 進行中 / 待辦（階段 1）
 
-- [ ] `server/config/`：`database.js`、`passport.js`、新增 `departments.js`
-- [ ] `server/utils/`：`employeeValidation.js`（部門 config 化）、`logger.js`
-- [ ] `server/middleware/auth.middleware.js`
-- [ ] `server/domain/`：edc 純函式 + store（由 crawler/ 抽出），新增 `config/stations.js`
+- [x] `server/config/`：`database.js`（走 env）、`passport.js`、`departments.js`、`stations.js`（+ client copy）
+- [x] `server/utils/`：`employeeValidation.js`（部門 config 化）、`logger.js`
+- [x] `server/middleware/auth.middleware.js`
+- [x] `server/domain/`：`edcAnalysis` / `edcShift` / `edcStore` / `unfinishStore`（+ 3 個測試共 24 項全綠）
+  - `__fixtures__/generateEdcSample.js` → 合成 EDC 樣本（取代真實 fixture）
+  - `phaseProcess.js` 未搬（爬蟲耦合太深、內部站名多；日後趨勢線選擇功能再議）
 - [ ] `server/ingestion/`：`adapter.js` + `seedAdapter.js`
 - [ ] `server/controllers/` + `server/routes/`（去識別化；不接 HourlyDefect/OverShoot 路由）
 - [ ] `server/index.js`
