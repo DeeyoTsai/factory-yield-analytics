@@ -40,7 +40,17 @@
   - **`npm run build` 通過**（只剩 ESLint warning）
 - [x] `ml/`：FastAPI 骨架（`app.py`）+ `mock_detector.py` + `classes.json`（12 類）+ README
 - [x] `docs/ingestion.md`（直連 DB / 爬蟲 / 檔案佇列 三 pattern + adapter 契約）
-- [ ] 前端接 server 跑起來截圖驗收（設計文件 §4.8）—— 進行中
+- [x] **前端接 server 端到端驗收**（設計文件 §4.8）：
+  - `npm run seed` → `npm run dev`（server, PORT 8090）→ `npm run build` → 開瀏覽器
+  - 10 畫面全部渲染、無 console error
+  - Daily Yield 三層鑽取 ✅（Defect Map / 站別檢出分布 / Glass Details / ADI/Rework History / 趨勢圖 / Oven Slot）
+  - 未結批三層鑽取 ✅、EDC 二層鑽取 ✅（by-shot 散點圖畫出分段/中位線/離群點）
+  - 排程/機況甘特圖 ✅、堆疊長條圖 ✅、6 donut ✅
+  - **FMA 填表畫面**：能開，但表格是舊 24 欄硬編（見下方延後）
+
+## 階段 1 = 完成 ✅
+
+server + client 端到端可跑的去識別化開源版本。public repo commit：`8e4002c` 為止。
 
 ## 已知延後（不在階段 1）
 
