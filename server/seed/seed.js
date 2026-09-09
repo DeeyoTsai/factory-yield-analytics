@@ -77,7 +77,7 @@ async function seedFma() {
     for (let g = 0; g < nGlass; g += 1) {
       const gid = `GL-${day.replace(/-/g, "").slice(2)}-${pad(rng.int(1, 999))}`;
       gids.push(gid);
-      const row = { date: day, gid, outlineId: outline.id, s: rng.int(0, 6), m: rng.int(0, 4), l: rng.int(0, 2), otherdf: "[]" };
+      const row = { date: day, gid, outlineId: outline.id, s: rng.int(0, 6), m: rng.int(0, 4), l: rng.int(0, 2), otherdf: [] };
       for (const key of DEFECT_KEYS) row[key] = rng.bool(0.35) ? rng.int(1, 6) : 0;
       rows.push(row);
     }

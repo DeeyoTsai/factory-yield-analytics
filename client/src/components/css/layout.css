@@ -1,0 +1,29 @@
+/* For a footer that sticks to the bottom of the page */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh; /* Ensures the container takes at least the full viewport height */
+}
+
+.main {
+  flex: 1; /* Pushes the footer down to the bottom */
+  padding: 1em;
+}
+
+/* For a footer that is fixed to the viewport */
+/*
+.app-footer {
+  position: fixed;
+  width: 100%;
+  bottom: 0;
+  background-color: #f8f9fa; // Example background color
+  padding: 1em;
+  text-align: center;
+}
+*/
+.app-footer {
+  background-color: #dcdcdc;
+  padding: 1em;
+  text-align: center;
+  margin-top: auto; /* Needed if you are NOT using the flexbox layout in .app-container */
+}/*# sourceMappingURL=layout.css.map */

@@ -1,0 +1,10 @@
+# 最小推論服務骨架
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+
+# 接真的 YOLOv10 時再裝（骨架用 mock_detector 不需要）：
+# ultralytics>=8.1
+# torch
+# opencv-python-headless
+# pillow

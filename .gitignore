@@ -35,3 +35,6 @@ ml/weights/
 .idea/
 .vscode/
 coverage/
+
+# CRA local env
+.env*.local

@@ -144,15 +144,21 @@ async function seedEqActions(days, seedBase) {
   const rng = makeRng(seedBase + 7);
   const rows = [];
   for (const day of days) {
+    // 前端「排程與機況履歷」查詢的 startend 窗口＝(選定日-1) 07:00 ~ (選定日+1) 07:00
+    const prev = dayjs(day).subtract(1, "day").format("YYYY-MM-DD");
+    const next = dayjs(day).add(1, "day").format("YYYY-MM-DD");
+    const startend = `${prev} 07:00 - ${next} 07:00`;
+    // 事件鋪在「(選定日-1) 07:00 ~ 選定日 07:00」這個生產日，正好落在甘特圖的 x 軸窗口內
+    const shiftStart = dayjs(`${prev}T07:00:00`);
     for (const line of LINES) {
-      let hour = 6;
-      while (hour < 30) {
+      let hour = 0;
+      while (hour < 24) {
         const dur = rng.int(1, 5);
-        const begin = dayjs(day).hour(hour % 24).minute(rng.int(0, 30)).add(hour >= 24 ? 1 : 0, "day");
+        const begin = shiftStart.add(hour, "hour").add(rng.int(0, 40), "minute");
         const end = begin.add(dur, "hour");
         const status = rng.pick(EQ_STATUS);
         rows.push({
-          startend: `${begin.format("YYYY/MM/DD")}`,
+          startend,
           line,
           eq: `${line}-EQ${rng.int(1, 4)}`,
           code: `C${rng.int(100, 999)}`,

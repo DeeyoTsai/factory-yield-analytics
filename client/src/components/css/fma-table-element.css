@@ -1,0 +1,63 @@
+* {
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-style: normal;
+}
+
+ul {
+  list-style-type: none;
+}
+
+a {
+  text-decoration: none;
+  color: white;
+}
+
+div.fma-result-input table {
+  width: 100%;
+  border-collapse: collapse;
+}
+div.fma-result-input table thead {
+  background-color: rgb(203, 218, 224);
+}
+div.fma-result-input table thead tr th {
+  border: 1px solid #272727;
+}
+div.fma-result-input table thead tr th.df-cal {
+  background-color: wheat;
+}
+div.fma-result-input table tbody tr.df-row {
+  background-color: white;
+}
+div.fma-result-input table tbody tr.df-row td {
+  word-break: break-word;
+  border: 1px solid #272727;
+  text-align: center;
+}
+div.fma-result-input table tbody tr.df-row td.edit-color {
+  background-color: #f0efdb;
+}
+div.fma-result-input table tbody tr.df-row button.trash-button {
+  background-color: white;
+}
+div.fma-result-input table tbody tr.df-row:hover td,
+div.fma-result-input table tbody tr.df-row:hover td.edit-color {
+  background-color: #d2e4b5 !important;
+}
+div.fma-result-input table tfoot td {
+  border: 1px solid #272727;
+  text-align: center;
+  background-color: rgb(146, 209, 211);
+}
+div.fma-result-input table tfoot td.s-m-l-sum {
+  background-color: lightgoldenrodyellow;
+}/*# sourceMappingURL=fma-table-element.css.map */

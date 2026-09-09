@@ -29,15 +29,27 @@ module.exports = (sequelize, Sequelize) => {
     m: { type: DataTypes.SMALLINT.UNSIGNED },
     l: { type: DataTypes.SMALLINT.UNSIGNED },
     // 不在 12 類內的其他缺陷，自由格式陣列
+    // 不在 12 類內的其他缺陷：陣列 [{ 名稱: 數量 }, ...]
+    // 存成 JSON 字串（MariaDB 的 DataTypes.JSON 是 longtext），讀回一律正規化成陣列
     otherdf: {
       type: DataTypes.JSON,
       defaultValue: "[]",
       get() {
-        const rawValue = this.getDataValue("otherdf");
-        return rawValue ? JSON.parse(rawValue) : [];
+        let v = this.getDataValue("otherdf");
+        if (typeof v === "string") {
+          try { v = JSON.parse(v); } catch (_) { v = []; }
+        }
+        // 舊資料可能被雙重 stringify（"\"[]\"" -> "[]" 字串）
+        if (typeof v === "string") {
+          try { v = JSON.parse(v); } catch (_) { v = []; }
+        }
+        return Array.isArray(v) ? v : [];
       },
       set(value) {
-        this.setDataValue("otherdf", JSON.stringify(value));
+        this.setDataValue(
+          "otherdf",
+          JSON.stringify(Array.isArray(value) ? value : [])
+        );
       },
     },
   });

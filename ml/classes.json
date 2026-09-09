@@ -1,0 +1,64 @@
+{
+  "classes": [
+    {
+      "id": 0,
+      "name": "scratch",
+      "label": "刮傷"
+    },
+    {
+      "id": 1,
+      "name": "particle",
+      "label": "異物"
+    },
+    {
+      "id": 2,
+      "name": "stain",
+      "label": "髒污"
+    },
+    {
+      "id": 3,
+      "name": "broken",
+      "label": "破損"
+    },
+    {
+      "id": 4,
+      "name": "bubble",
+      "label": "氣泡"
+    },
+    {
+      "id": 5,
+      "name": "residue",
+      "label": "殘膠"
+    },
+    {
+      "id": 6,
+      "name": "film_thickness",
+      "label": "膜厚異常"
+    },
+    {
+      "id": 7,
+      "name": "develop_fail",
+      "label": "顯影不良"
+    },
+    {
+      "id": 8,
+      "name": "chip",
+      "label": "崩缺"
+    },
+    {
+      "id": 9,
+      "name": "bright_spot",
+      "label": "亮點"
+    },
+    {
+      "id": 10,
+      "name": "dark_spot",
+      "label": "暗點"
+    },
+    {
+      "id": 11,
+      "name": "color_uneven",
+      "label": "色不均"
+    }
+  ]
+}

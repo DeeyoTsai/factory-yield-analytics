@@ -46,7 +46,8 @@ EMAIL_ALLOW='@(example\.(com|org|net)|test\.com|localhost|users\.noreply\.github
 SCAN_ARGS=(
   -rniE
   --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=build
-  --exclude-dir=dist --exclude-dir=venv --exclude-dir=coverage
+  --exclude-dir=dist --exclude-dir=venv --exclude-dir=coverage --exclude-dir=logs
+  --exclude='.env' --exclude='.env.local'
   --exclude='*.png' --exclude='*.jpg' --exclude='*.jpeg' --exclude='*.gif'
   --exclude='*.svg' --exclude='*.ico' --exclude='*.pdf'
   --exclude='*.woff' --exclude='*.woff2' --exclude='*.ttf' --exclude='*.eot'

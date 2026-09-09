@@ -29,17 +29,28 @@
 - [x] **server 端到端可跑**：`npm run seed` OK；`npm run dev` 啟動；API 煙霧測試（login / statistics /
   rgbtopfive / edc summary / eq-actions / unfinish / glass-info）全部回真資料
   - EDC 的 SPC 分段/離群分析在 seed 時實際跑過（站別A 全距 4.75 紅燈、其餘綠燈）
-- [ ] `client/`：config / services / contexts / 核心子集元件（10 畫面）
-- [ ] `ml/`：FastAPI 骨架 + mock detector + classes.json
-- [ ] `docs/ingestion.md`（FTP/爬蟲/直連三 pattern）
-- [ ] 前端接起來截圖驗收（設計文件 §4.8）
+- [x] `client/`：config / services / contexts / 核心子集元件搬移 + 去識別化
+  - `App.js` 收成 10 條路由；nav 移除 個人頁面 / ADI Analysis
+  - `DashboardContext` / `FmaContext`：缺陷對照表改由 `config/defectTypes.js` 產生
+  - `ProtectedRoute`：加 `loading` gate（修硬重整受保護頁被踢回登入的既有 bug）
+  - `login-component`：加「以 Demo 帳號登入」按鈕；導向改 `/`
+  - `pageFooter` / `ExternalLinksView`（改 8 條範例連結）/ `index.html` title 去識別化
+  - `stationProfile.js`：STATIONS 順序 + ReworkHis 欄名 `r1..b2` → `l1..l6`
+  - `client/package.json` + `.env.production`（相對 API URL）
+  - **`npm run build` 通過**（只剩 ESLint warning）
+- [x] `ml/`：FastAPI 骨架（`app.py`）+ `mock_detector.py` + `classes.json`（12 類）+ README
+- [x] `docs/ingestion.md`（直連 DB / 爬蟲 / 檔案佇列 三 pattern + adapter 契約）
+- [ ] 前端接 server 跑起來截圖驗收（設計文件 §4.8）—— 進行中
 
 ## 已知延後（不在階段 1）
 
+- **`fma-table-element.js` 的表格仍是舊 24 欄硬編 `<td>`**——FMA 填表畫面能開但表格排版未對齊
+  12 類 model。完整改成 12 欄動態表格 = 「YOLO × FMA 整合」階段的工作（設計文件 §4.3 也是這樣切）
 - `HourlyDefect` / `OverDefectDetail` model 保留（表照建），routes 不接，內容未去識別化
 - ADI Analysis / 個人頁 / OverShoot 畫面
 - `RgbTopFive` model 名不改（"RGB" 非識別資訊，改名 = 大 cascade）
-- `HourlyDefect` 欄位前綴 `r1_/g1_...` 未改（route 未接）
+- `stationProfile.js` 的 `STATION_ALIAS` / `others` 桶名（`Offline_AOI` / `Unknown` / `OC2` …）
+  是通用 fallback 概念，暫留
 
 ## 跨 PC 續作
 

@@ -1,0 +1,13 @@
+/* Example of custom styling */
+.react-date-picker__wrapper {
+  border: 1px solid #ffffff;
+  border-radius: 4px;
+  text-align: left;
+  margin: 0, 0, 0, 0;
+  padding-left: 0;
+}
+
+.react-calendar__tile--active {
+  background-color: #007bff;
+  color: white;
+}/*# sourceMappingURL=fma-query-component.css.map */
