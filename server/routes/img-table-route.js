@@ -11,14 +11,26 @@ const EqAction = db.EqAction;
 const ShtSmlCount = db.ShtSmlCount;
 
 router.get("/queryByGlasses", async (req, res) => {
-  const glasses = req.query.items;
+  // items 單筆時 express 會給字串，統一成陣列避免 Op.in 爆掉
+  const raw = req.query.items;
+  const glasses = Array.isArray(raw) ? raw : raw ? [raw] : [];
   const line = req.query.line;
 
   try {
+    // line 有帶就一起篩；沒帶（demo：使用者只輸入 glass id 未選產線）就只用 gid 比對
+    const where = {
+      gid: { [Op.in]: glasses },
+      show_flag: 1,
+    };
+    if (line && line !== "DEFAULT") {
+      where.line = { [Op.eq]: line };
+    }
+
     const foundData = await Imagetbs.findAll({
       attributes: [
         "id",
         "gid",
+        "lot",
         "datetime",
         "xpos",
         "ypos",
@@ -31,17 +43,7 @@ router.get("/queryByGlasses", async (req, res) => {
         "show_flag",
         "show_pos",
       ],
-      where: {
-        [Op.and]: {
-          line: {
-            [Op.eq]: line,
-          },
-          gid: {
-            [Op.in]: glasses,
-          },
-          show_flag: 1,
-        },
-      },
+      where,
     });
     // console.log(foundData);
     return res.send({
@@ -53,6 +55,28 @@ router.get("/queryByGlasses", async (req, res) => {
     return res.status(400).send({
       msg: "Image table內查無資料!",
     });
+  }
+});
+
+// Demo 用：回傳幾個「確定有影像」的 glass id，讓 FMA 填表頁能一鍵帶入示範資料。
+// 接自己的資料流之後這支可以直接刪掉（前端拿不到就不顯示提示列）。
+router.get("/demoGlasses", async (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 5, 20);
+  try {
+    const found = await Imagetbs.findAll({
+      attributes: ["gid", "line"],
+      where: { show_flag: 1 },
+      group: ["gid", "line"],
+      order: [["gid", "ASC"]],
+      limit,
+    });
+    return res.send({
+      success: true,
+      glasses: found.map((f) => ({ gid: f.gid, line: f.line })),
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).send({ success: false, msg: "示範 glass id 取得失敗" });
   }
 });
 
@@ -217,7 +241,9 @@ router.get("/queryProductByLot", async (req, res) => {
 
 router.get("/querySmlByLineGls", async (req,res) => {
   const line = req.query.ln;
-  const gls_arr = req.query.gls_arr;
+  // 單筆時 express 給字串，統一成陣列避免 Op.in 爆掉（同 queryByGlasses）
+  const rawGls = req.query.gls_arr;
+  const gls_arr = Array.isArray(rawGls) ? rawGls : rawGls ? [rawGls] : [];
 
   const lineCvtEq = {
     'L1':'AOI-01',

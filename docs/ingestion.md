@@ -82,17 +82,48 @@ FTP 資料交換屬於這一類——本專案只描述概念，不附 FTP clien
 
 ---
 
-## YOLO 影像
+## YOLO 影像 → FMA 表格預填
 
 `imagetb` 表存每張 defect 影像的原圖 / 預測圖路徑 + `pred_result`（detector 回傳的
-JSON）+ 人工複判。ingestion adapter 負責把影像路徑與 detector 結果寫進這張表；
-detector 本身見 [`../ml/README.md`](../ml/README.md)。
+JSON）+ 人工複判。
 
-`pred_result` 格式：
+### `pred_result` 契約
 
 ```json
-{ "detections": [ { "class": "刮傷", "confidence": 0.92, "bbox": [x, y, w, h] } ] }
+{ "detections": [ { "class": "scratch", "confidence": 0.92, "bbox": [x, y, w, h] } ] }
 ```
 
-`class` 用 `server/config/defectTypes.js` 的 `yolo` 欄位值。前端 FMA 表單會把
-第一筆 detection 對照到對應的缺陷欄位、預填進表格。
+`class` 用 `server/config/defectTypes.js` 的 `yolo` 欄位值（`scratch` / `particle` /
+`film_thickness` …），**不是**中文 label。前端經由 `yolo -> key` 對照把 detection
+對回 `fmatb` 欄位。
+
+### 端到端流程
+
+1. FMA 填表頁輸入 glass id → 按 **Refresh**
+2. 前端 `GET /api/imgtable/queryByGlasses`（帶目前產線 + glass id 清單）撈 `imagetb`
+3. 每張影像取**第一筆** detection，用 `defectTypes.js` 的 `yolo -> key` 統計成
+   `{ gid: { <缺陷欄位>: 次數 } }`
+4. 該列若使用者還沒手動填過非零值 → 自動預填進 FMA 表格對應欄位
+   （`client/src/components/elements/fma-table-element.js` 的 `predictMap` effect）
+
+demo 資料（`npm run seed`）已直接把合成的 `pred_result` 寫進 `imagetb`，
+**不需要跑推論服務**就能看到預填效果。
+
+### 接真的 YOLO
+
+`server/ingestion/detector.js` 是 server 端呼叫推論的薄封裝：
+
+```js
+const { detect } = require("./ingestion/detector");
+
+// image 可以是本機路徑 / Buffer / http(s) URL
+const { detections, pred_result } = await detect(oriImgPath);
+// pred_result 就是可直接寫進 imagetb.pred_result 的字串
+```
+
+- 設了 `server/.env` 的 `DETECTOR_URL`（例如 `http://localhost:8000/detect`，見
+  [`../ml/README.md`](../ml/README.md)）→ POST 影像過去、用回應的 detections。
+- 沒設 → 用 `detector.js` 內建 mock（依影像位元組雜湊產生穩定的假 detection）。
+
+要讓 ingestion adapter 真的呼叫 YOLO，把 `seedAdapter.js` `seedImages()` 裡
+合成 `detections` 的那段換成 `await detect(oriImgPath)` 即可。

@@ -9,6 +9,7 @@ import FmaService from "../services/fma.service";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useFma } from "../contexts/FmaContext";
+import { DEFECT_KEYS } from "../config/defectTypes";
 
 const QueryResultComponent = () => {
   const { currentUser } = useAuth();
@@ -32,6 +33,9 @@ const QueryResultComponent = () => {
   const [dfAvgForBar, setDfAvgForBar] = useState([]);
   const [dfRatioForLine, setDfRatioForLine] = useState([]);
   const [sortedDfArr, setSortedDfArr] = useState([]);
+  // 與 sortedDfArr 索引對應的 ratio（FmaEchartElement 排序後回傳），
+  // dfRatioForLine 則維持「欄位順序」給表尾用，兩者不可混用。
+  const [sortedRatios, setSortedRatios] = useState([]);
   const [standardRowNum, setStandardRowNum] = useState(0);
   const [datetime, setDatetime] = useState("");
   const [canEdit, setCanEdit] = useState(false); // 是否可以編輯此資料
@@ -211,37 +215,8 @@ const QueryResultComponent = () => {
         // 移除空值和非數值欄位
         const cleaned = { ...glass };
 
-        // 確保數值欄位為數字類型
-        const numericFields = [
-          "runder",
-          "gunder",
-          "bunder",
-          "bmwp",
-          "rwp",
-          "gwp",
-          "bwp",
-          "rgel",
-          "ggel",
-          "bgel",
-          "rdevabnormal",
-          "gdevabnormal",
-          "bdevabnormal",
-          "rfiber",
-          "gfiber",
-          "bfiber",
-          "bp",
-          "bmdirty",
-          "repair",
-          "abovep",
-          "backdirty",
-          "dirty",
-          "ovendrop",
-          "black",
-          "s",
-          "m",
-          "l",
-          "sqlId",
-        ];
+        // 確保數值欄位為數字類型（12 類缺陷 + S/M/L + sqlId）
+        const numericFields = [...DEFECT_KEYS, "s", "m", "l", "sqlId"];
         numericFields.forEach((field) => {
           if (cleaned[field] !== undefined && cleaned[field] !== null) {
             cleaned[field] = Number(cleaned[field]) || 0;
@@ -270,11 +245,11 @@ const QueryResultComponent = () => {
           e.line = line;
           e.product = product;
           e.first =
-            sortedDfArr[0] + "-" + (dfRatioForLine[0] * 100).toFixed(1) + "%";
+            sortedDfArr[0] + "-" + ((sortedRatios[0] || 0) * 100).toFixed(1) + "%";
           e.second =
-            sortedDfArr[1] + "-" + (dfRatioForLine[1] * 100).toFixed(1) + "%";
+            sortedDfArr[1] + "-" + ((sortedRatios[1] || 0) * 100).toFixed(1) + "%";
           e.third =
-            sortedDfArr[2] + "-" + (dfRatioForLine[2] * 100).toFixed(1) + "%";
+            sortedDfArr[2] + "-" + ((sortedRatios[2] || 0) * 100).toFixed(1) + "%";
           e.updatedAt = new Date(datetime).toLocaleString("sv");
           e.datetime = new Date(datetime).toLocaleString("sv");
           e.comment = postContent;
@@ -458,7 +433,7 @@ const QueryResultComponent = () => {
                   type="text"
                   className="form-control"
                   name="product"
-                  placeholder="ex:PNL-B156"
+                  placeholder="ex:PNL-C238"
                   value={product}
                   readOnly={isReadyOnly}
                   disabled={isReadyOnly}
@@ -560,7 +535,7 @@ const QueryResultComponent = () => {
               line={line}
               product={product}
               sortedDfArr={sortedDfArr}
-              dfRatioForLine={dfRatioForLine}
+              sortedRatios={sortedRatios}
               editable={isReadyOnly}
               smlAvg={smlAvg}
               standardRowNum={standardRowNum}
@@ -578,8 +553,8 @@ const QueryResultComponent = () => {
               setDfRatioForLine={setDfRatioForLine}
               defectArr={defectArr}
               product={product}
-              sortedDfArr={sortedDfArr}
               setSortedDfArr={setSortedDfArr}
+              setSortedRatios={setSortedRatios}
             />
           </div>
           <div className="card-body pt-2 pb-2">
@@ -593,6 +568,7 @@ const QueryResultComponent = () => {
           <div className="card-body pt-2 pb-4">
             <DefectTableElement
               defectArr={defectArr}
+              line={line}
               glassDataSet={glassDataSet}
               editable={isReadyOnly}
               onImagesLoaded={setPoolImages}

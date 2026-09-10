@@ -6,43 +6,22 @@ import DefectTableElement from "./defect-table-element";
 import DragDropImageTable from "./drag-drop-image-table";
 import { useNavigate } from "react-router-dom";
 import FmaService from "../../services/fma.service";
+import ImageService from "../../services/image.service";
 // import fmaService from "../../services/fma.service";
 // import ImageService from "../../services/image.service";
 import FmaTextareaElement from "./fma-textarea-element";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import "../css/DatePickerStyles.css";
+import { DEFECT_KEYS } from "../../config/defectTypes";
 
 const QueryFormComponent = (props) => {
   const navigate = useNavigate();
-  const oriDbDefect = [
-    "runder",
-    "gunder",
-    "bunder",
-    "bmwp",
-    "rwp",
-    "gwp",
-    "bwp",
-    "rgel",
-    "ggel",
-    "bgel",
-    "rresistsmall",
-    "gresistsmall",
-    "bresistsmall",
-    "rfiber",
-    "gfiber",
-    "bfiber",
-    "bp",
-    "bmdirty",
-    "repair",
-    "abovep",
-    "backdirty",
-    "dirty",
-    "ovendrop",
-    "black",
-  ];
+  const oriDbDefect = DEFECT_KEYS; // 12 類缺陷欄位（config/defectTypes.js）
 
   let [standardRowNum, setStandardRowNum] = useState(5);
+  const [glassRows, setGlassRows] = useState([]); // FmaTableElement 同步回來的目前列資料
+  const [customColNames, setCustomColNames] = useState([]);
   let [smlAvg, setSmlAvg] = useState(0.0);
   // let [othersColSpan, setOthersColSpan] = useState(5);
   // For barChart --> all Total Num data
@@ -50,6 +29,9 @@ const QueryFormComponent = (props) => {
   // For lineChart --> all Avg Num data
   let [dfRatioForLine, setDfRatioForLine] = useState([]);
   let [sortedDfArr, setSortedDfArr] = useState([]);
+  // 與 sortedDfArr 索引一一對應的 ratio（由 FmaEchartElement 排序後回傳）。
+  // 不可以直接用 dfRatioForLine —— 那是「欄位順序」的，不是排序後的。
+  const [sortedRatios, setSortedRatios] = useState([]);
   // const sortedDfArrRef = useRef(sortedDfArr);
   let [message, setMessage] = useState("");
   let messageRef = useRef(message);
@@ -60,6 +42,9 @@ const QueryFormComponent = (props) => {
   const [poolImages, setPoolImages] = useState([]);
   const [dragSlots, setDragSlots] = useState({});
   const [predictMap, setPredictMap] = useState({});
+  // Demo 引導：有 YOLO 影像的示範 Glass ID（後端沒這支 API 就不顯示提示列）
+  const [demoGlasses, setDemoGlasses] = useState([]);
+  const [presetGids, setPresetGids] = useState([]);
   // const [commentDfArr, setCommentDfArr] = useState([]);
   // let [tableData, setTableData] = useState(initTableData);
 
@@ -82,139 +67,99 @@ const QueryFormComponent = (props) => {
     // console.log(standardRowNum);
   };
   const handleSubmitBtnEvent = async () => {
-    let fmaTable = document.querySelectorAll(".df-row");
-    let sheetCol = ["s", "m", "l"];
-    let glassDataSet = [];
-    let outlineId;
-    let outlineSaveErr = "";
     if (props.line === "" || props.product === "") {
       window.alert("產線 & 品名為必填，欄位不可為空!");
-    } else {
-      // 送出fma Outline，包含前三大defect、送出時間 ==> outline data
-      const place = ["first", "second", "third"];
-      let infomData = {};
-      if (sortedDfArr.length < 3) {
-        sortedDfArr.forEach((e, i) => {
-          let contain = e + "-" + (dfRatioForLine[i] * 100).toFixed(1) + "%";
-          const key = place[i];
-          Object.assign(infomData, { [key]: contain });
-        });
-      } else {
-        place.forEach((e, i) => {
-          let contain =
-            sortedDfArr[i] + "-" + (dfRatioForLine[i] * 100).toFixed(0) + "%";
-          // const key = e;
-          Object.assign(infomData, { [e]: contain });
-        });
+      return;
+    }
+
+    const rows = (glassRows || []).filter((r) => String(r.gid || "").trim().length > 0);
+    if (rows.length === 0) {
+      window.alert("至少要有一列填了 Glass ID");
+      return;
+    }
+
+    // outline：前三大 defect（by ratio）、送出時間、拖拉圖片槽位
+    const place = ["first", "second", "third"];
+    const infomData = {};
+    place.forEach((key, i) => {
+      if (sortedDfArr[i] != null) {
+        infomData[key] = `${sortedDfArr[i]}-${((sortedRatios[i] || 0) * 100).toFixed(0)}%`;
       }
-      // console.log(fmaTable);
-      let lot = fmaTable[0].childNodes[1].innerText.slice(0, 7);
-      let finalComment = document.querySelector("#floatingTextarea2").innerHTML;
-      // console.log(finalComment);
-      const nowTime = new Date().toLocaleString("sv").split(" ")[1];
-      Object.assign(
-        infomData,
-        {
-          datetime: props.pickdate
-            ? new Date(`${props.pickdate} ${nowTime}`)
-            : new Date(),
-        },
-        { emp: props.employee },
-        { line: props.line },
-        { product: props.product },
-        { comment: finalComment },
-        { lot },
-        { drag_slots: dragSlots },
-      );
-      try {
-        // console.log(infomData);
-        const outlineData = await FmaService.addOutline(infomData);
-        outlineId = outlineData.data.savedFmaOutline.id;
-      } catch (e) {
-        console.log(e);
-        outlineSaveErr += e.response.data.msg;
-        setMessage(outlineSaveErr);
-        messageRef.current = outlineSaveErr;
-      }
-      // 送出fma table寫資料
-      fmaTable.forEach((dfRow) => {
-        let rowArr = [];
-        let otherDefectArr = [];
-        dfRow.childNodes.forEach((e) => {
-          rowArr.push(e.innerText);
-        });
-        let g_id = rowArr[1];
-        // glass id不為空字串才發送資料
-        if (g_id.length > 0) {
-          const rowDfCount = rowArr
-            .splice(2, props.defectArr.length)
-            .map(Number);
+    });
 
-          const rowSml = rowArr.splice(-5, 3).map(Number);
-          let rowDfCountObj = {};
-          rowDfCountObj.otherdf = otherDefectArr;
-          let rowSmlObj = {};
-          props.defectArr.forEach((e, i) => {
-            e = e.split("-").join("");
-            // 表格內的defect，以物件方式儲存
-            if (oriDbDefect.includes(e)) {
-              rowDfCountObj[e] = rowDfCount[i];
-              //新增的defect，以array包object方式儲存
-            } else {
-              const newDfObj = { [e]: rowDfCount[i] };
-              // rowDfCount.otherDf[e] = rowDfCount[i];
-              otherDefectArr.push(newDfObj);
-            }
-          });
+    const finalComment = postContent;
+    const nowTime = new Date().toLocaleString("sv").split(" ")[1];
+    Object.assign(infomData, {
+      datetime: props.pickdate ? new Date(`${props.pickdate} ${nowTime}`) : new Date(),
+      emp: props.employee,
+      line: props.line,
+      product: props.product,
+      comment: finalComment,
+      lot: String(rows[0].gid).slice(0, 8),
+      drag_slots: dragSlots,
+    });
 
-          // 新增defect array轉string for data儲存
-          // rowDfCountObj.otherDf = JSON.stringify(otherDefectArr);
+    let outlineId;
+    let err = "";
+    try {
+      const res = await FmaService.addOutline(infomData);
+      outlineId = res.data.savedFmaOutline.id;
+    } catch (e) {
+      err += e.response?.data?.msg || "Outline 儲存失敗";
+      setMessage(err);
+      messageRef.current = err;
+      return;
+    }
 
-          sheetCol.forEach((e, i) => {
-            rowSmlObj[e] = rowSml[i];
-          });
-          // 移除沒有數值的defect column
-          const rmZero = (item) =>
-            Object.keys(item)
-              .filter((key) => item[key] !== 0)
-              .reduce((newObj, key) => {
-                newObj[key] = item[key];
-                return newObj;
-              }, {});
-          // Concate objects
-          const rowData = Object.assign(
-            {},
-            rmZero(rowDfCountObj),
-            rmZero(rowSmlObj),
-            // { fmaEmployee: props.employee },
-            // { line: props.line },
-            { date: props.pickdate },
-            // { product: props.product },
-            { gid: g_id },
-            { outlineId },
-          );
-          glassDataSet.push(rowData);
-        }
+    // glass 列：12 個標準欄位 + otherdf（自訂欄）
+    const glassDataSet = rows.map((r) => {
+      const otherdf = [];
+      Object.values(r.otherdf || {}).forEach((obj) => {
+        const name = Object.keys(obj)[0];
+        const count = Number(Object.values(obj)[0]) || 0;
+        if (name && count > 0) otherdf.push({ [name]: count });
       });
-      try {
-        // console.log(glassDataSet);
-        await FmaService.addGlasses(props.employee, glassDataSet);
-        if (messageRef.current === "") {
-          window.alert("FMA資料儲存成功，將重新導向回查詢頁面!!");
-          navigate("/fmaquery");
-        }
-      } catch (e) {
-        console.log(e);
-        // setMessage((prev) => prev + e.response.data.msg);
-        outlineSaveErr += e.response.data.msg;
-        setMessage(outlineSaveErr);
-        messageRef.current = outlineSaveErr;
+      const out = { gid: r.gid, date: props.pickdate, outlineId, otherdf };
+      oriDbDefect.forEach((k) => { out[k] = Number(r[k]) || 0; });
+      out.s = Number(r.s) || 0;
+      out.m = Number(r.m) || 0;
+      out.l = Number(r.l) || 0;
+      return out;
+    });
+
+    try {
+      await FmaService.addGlasses(props.employee, glassDataSet);
+      if (messageRef.current === "") {
+        window.alert("FMA資料儲存成功，將重新導向回查詢頁面!!");
+        navigate("/fmaquery");
       }
+    } catch (e) {
+      err += e.response?.data?.msg || "Glass 資料儲存失敗";
+      setMessage(err);
+      messageRef.current = err;
     }
   };
   const handleAddCol = () => {
     props.setOthersColSpan(props.othersColSpan + 1);
     // console.log(othersColSpan);
+  };
+
+  // 取示範 Glass ID：只留同一條產線的，帶入後按 Refresh 才查得到影像
+  useEffect(() => {
+    ImageService.demoGlasses(12)
+      .then((res) => {
+        const all = res.data?.glasses || [];
+        if (all.length === 0) return;
+        const ln = all[0].line;
+        setDemoGlasses(all.filter((g) => g.line === ln).slice(0, 5));
+      })
+      .catch(() => setDemoGlasses([])); // 沒有這支 API 就靜靜不顯示
+  }, []);
+
+  const applyDemoGlasses = () => {
+    if (demoGlasses.length === 0) return;
+    props.setLine(demoGlasses[0].line);
+    setPresetGids(demoGlasses.map((g) => g.gid));
   };
 
   useEffect(() => {
@@ -274,11 +219,11 @@ const QueryFormComponent = (props) => {
               <label htmlFor="line" className="col-sm-2 col-form-label ">
                 產線:
               </label>
+              {/* 受控：一鍵帶入示範資料時要能連動選到對應產線 */}
               <select
                 onChange={handleLine}
-                // value={props.line}
+                value={props.line || "DEFAULT"}
                 className="form-select"
-                defaultValue={"DEFAULT"}
               >
                 <option value="DEFAULT" disabled>
                   ---請選擇Line別---
@@ -309,34 +254,39 @@ const QueryFormComponent = (props) => {
         {/* {message && <div className="alert alert-danger w-75">{message}</div>} */}
         <div className="card-body text-center">
           {message && <div className="alert alert-danger">{message}</div>}
+          {demoGlasses.length > 0 && (
+            <div
+              className="alert alert-info d-flex align-items-center justify-content-center flex-wrap gap-2 py-2 px-3 mb-2"
+              style={{ fontSize: "0.85rem" }}
+            >
+              <span className="fw-bold">示範資料</span>
+              <span className="text-muted">
+                帶入有 YOLO 影像的 Glass ID，再按下方「Refresh」載入預測結果與圖片
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-primary py-0"
+                onClick={applyDemoGlasses}
+              >
+                帶入 {demoGlasses.length} 筆（{demoGlasses[0].line}）
+              </button>
+            </div>
+          )}
           <FmaTableElement
-            currentUser={props.currentUser}
-            currentDate={props.currentDate}
-            employee={props.employee}
-            setEmployee={props.setEmployee}
-            pickdate={props.pickdate}
-            setPickdate={props.setPickdate}
-            line={props.line}
-            setLine={props.setLine}
+            presetGids={presetGids}
             product={props.product}
-            setProduct={props.setProduct}
+            editable={isReadyOnly}
             standardRowNum={standardRowNum}
             setStandardRowNum={setStandardRowNum}
             othersColSpan={props.othersColSpan}
-            setOthersColSpan={props.setOthersColSpan}
-            dfAvgForBar={dfAvgForBar}
+            setGlassDataSet={setGlassRows}
+            customColNames={customColNames}
+            setCustomColNames={setCustomColNames}
             setDfAvgForBar={setDfAvgForBar}
-            dfRatioForLine={dfRatioForLine}
             setDfRatioForLine={setDfRatioForLine}
-            defectArr={props.defectArr}
-            setDefectArr={props.setDefectArr}
-            // defectArrRef={props.defectArrRef}
-            editable={isReadyOnly}
             setSmlAvg={setSmlAvg}
             smlMap={smlMap}
             predictMap={predictMap}
-            // tableData={tableData}
-            // setTableData={setTableData}
           />
           <FmaTextareaElement
             postContent={postContent}
@@ -344,7 +294,7 @@ const QueryFormComponent = (props) => {
             line={props.line}
             product={props.product}
             sortedDfArr={sortedDfArr}
-            dfRatioForLine={dfRatioForLine}
+            sortedRatios={sortedRatios}
             editable={isReadyOnly}
             smlAvg={smlAvg}
             standardRowNum={standardRowNum}
@@ -391,8 +341,8 @@ const QueryFormComponent = (props) => {
             defectArr={props.defectArr}
             line={props.line}
             product={props.product}
-            // sortedDfArr={sortedDfArr}
             setSortedDfArr={setSortedDfArr}
+            setSortedRatios={setSortedRatios}
           />
         </div>
         <div className="card-body pt-2 pb-2">
@@ -407,11 +357,11 @@ const QueryFormComponent = (props) => {
             defectArr={props.defectArr}
             product={props.product}
             setProduct={props.setProduct}
+            line={props.line}
+            glassRows={glassRows}
             onSmlDataFetched={(map) => setSmlMap(map)}
             onImagesLoaded={setPoolImages}
             onPredictDataFetched={setPredictMap}
-            // sortedDfArr={sortedDfArr}
-            // defectArrRef={props.defectArrRef}
           />
         </div>
       </div>

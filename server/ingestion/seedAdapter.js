@@ -14,6 +14,7 @@ const { generateEdcRows } = require("../seed/edcGen");
 const { analyzeEdcData } = require("../domain/edcAnalysis");
 const { replaceEdcRecord } = require("../domain/edcStore");
 const { replaceUnfinishLot } = require("../domain/unfinishStore");
+const { renderPair, resetOutDir } = require("../seed/defectImages");
 
 const {
   RgbTopFive, AllTopFive, GlassInfo, Pdamtable, AdiRecord, ReworkHis,
@@ -275,37 +276,60 @@ async function seedEdc(days, seedBase) {
 }
 
 // ── YOLO 影像表（FMA 預填 demo）───────────────────────────────────────────
+// gids: string[] 或 [{ gid, line }][]。帶 line 時 imagetb.line 會對齊 FMA outline 的產線，
+// 讓 FMA 填表頁「Refresh」用同一條產線就查得到影像。
+//
+// 這裡 pred_result 是直接合成的，demo 不需要跑推論服務。要讓 seed 真的呼叫 YOLO，
+// 把下面 detections 換成 `await require("./detector").detect(oriImgPath)` 的結果即可
+// （設 server/.env 的 DETECTOR_URL 指向 ml/app.py，沒設會退回 detector 內建 mock）。
 async function seedImages(day, seedBase, gids) {
   const rng = makeRng(seedBase + 21);
-  const { imagetbs } = db;
+  const { imagetbs, ShtSmlCount } = db;
   const rows = [];
-  for (const gid of gids) {
-    const line = rng.pick(LINES);
-    const nDet = rng.int(1, 3);
-    const detections = Array.from({ length: nDet }, () => {
-      const d = rng.pick(DEFECT_TYPES);
-      return {
-        class: d.yolo,
-        confidence: Math.round(rng.float(0.55, 0.98) * 100) / 100,
-        bbox: [rng.int(0, 200), rng.int(0, 200), rng.int(20, 80), rng.int(20, 80)],
-      };
-    });
-    rows.push({
-      line, gid, lot: lotNo(day, rng.int(1, 20)),
-      datetime: `${day} ${pad(rng.int(8, 18))}:${pad(rng.int(0, 59))}:00`,
-      xpos: String(rng.int(0, 1300)), ypos: String(rng.int(0, 1100)),
-      ori_img_path: `https://picsum.photos/seed/${gid}ori/320/240`,
-      pred_img_path: `https://picsum.photos/seed/${gid}pred/320/240`,
-      txt_path: "",
-      pred_result: JSON.stringify({ detections }),
-      manual_result: rng.bool(0.15) ? rng.pick(DEFECT_TYPES).label : null,
-      check_flag: rng.bool(0.6),
-      show_flag: true,
-      show_pos: rng.int(0, 5),
-      emp: null,
-    });
+  const smlRows = [];
+
+  resetOutDir(); // 每次 seed 重畫，不累積舊檔
+
+  const lineToAoi = (ln) => `AOI-0${ln.slice(1)}`;
+
+  for (const entry of gids) {
+    const gid = typeof entry === "string" ? entry : entry.gid;
+    const line = (typeof entry === "object" && entry.line) || rng.pick(LINES);
+
+    // 每片 glass 2~4 張檢測影像，拖拉圖片庫才有東西可用
+    const nImg = rng.int(2, 4);
+    for (let i = 0; i < nImg; i += 1) {
+      // 多數影像單一缺陷，少數兩個 —— 順便展示 pred_result 可含多筆 detection
+      const nDef = rng.bool(0.25) ? 2 : 1;
+      const types = rng.shuffle(DEFECT_TYPES).slice(0, nDef);
+      const { ori, pred, detections } = renderPair(gid, i, rng, types);
+
+      rows.push({
+        line, gid, lot: lotNo(day, rng.int(1, 20)),
+        datetime: `${day} ${pad(rng.int(8, 18))}:${pad(rng.int(0, 59))}:00`,
+        xpos: String(rng.int(0, 1300)), ypos: String(rng.int(0, 1100)),
+        ori_img_path: ori,
+        pred_img_path: pred,
+        txt_path: "",
+        pred_result: JSON.stringify({ detections }),
+        // 少數已人工複判成別的類別 —— 首頁「模型健康度」靠這個算
+        manual_result: rng.bool(0.15) ? rng.pick(DEFECT_TYPES).label : null,
+        check_flag: rng.bool(0.6),
+        show_flag: true,
+        show_pos: i,
+        emp: null,
+      });
+    }
+
+    // Sheet data（S/M/L 顆數）：FMA 填表頁按 Refresh 會帶進表格右側三欄
+    const s = rng.int(0, 8);
+    const m = rng.int(0, 5);
+    const l = rng.int(0, 3);
+    smlRows.push({ gid, ln: lineToAoi(line), s, m, l, total: s + m + l });
   }
+
   await imagetbs.bulkCreate(rows);
+  await ShtSmlCount.bulkCreate(smlRows);
   return rows.length;
 }
 

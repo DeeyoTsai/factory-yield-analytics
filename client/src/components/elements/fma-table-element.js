@@ -1,1112 +1,380 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { FaTrashAlt } from "react-icons/fa";
 import "../css/fma-table-element.css";
-// import { collapseClasses } from "@mui/material";
-import "react-calendar/dist/Calendar.css";
-import { useFma } from "../../contexts/FmaContext";
+import { DEFECT_TYPES } from "../../config/defectTypes";
 
+// 12 類缺陷：key = fmatb 欄位名、label = 顯示名
+const DEFECT_KEYS = DEFECT_TYPES.map((d) => d.key);
+const DEFECT_LABELS = DEFECT_TYPES.map((d) => d.label);
 
+const num = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+
+function emptyRow(id, numCustom) {
+  const row = { id, gid: "", s: "", m: "", l: "", otherdf: {} };
+  for (const k of DEFECT_KEYS) row[k] = "";
+  for (let c = 1; c <= numCustom; c += 1) row.otherdf[`selfDefine_${c}`] = { "": "" };
+  return row;
+}
+
+/**
+ * FMA 填表的核心表格（受控 input，不用 contenteditable）。
+ *
+ * props:
+ *  - product            產品名（顯示在表頭）
+ *  - editable           true = 唯讀（沿用舊命名，true 代表不可編輯）
+ *  - standardRowNum     目標列數（「新增項次」按鈕控制）
+ *  - othersColSpan      5 + 自訂欄數（「新增欄位」按鈕控制）
+ *  - glassDataSet       非空陣列時代表「編輯既有資料」，用它初始化
+ *  - setGlassDataSet    每次表格變動就把目前列資料同步回 parent（送出/更新時用）
+ *  - smlMap / predictMap  { gid: {...} } —— 由 YOLO 影像複判帶入的 S/M/L 與缺陷預填
+ *  - setDfRatioForLine / setDfAvgForBar / setSmlAvg  餵給 FMA 圖表
+ *  - customColNames / setCustomColNames  自訂欄名（string[]，長度 = othersColSpan-5）
+ *  - presetGids         一鍵帶入示範 Glass ID（demo 用；傳新陣列即套用到前 N 列）
+ */
 const FmaTableElement = ({
   product,
   editable,
-  // defectArr,
-  // setDefectArr,
   standardRowNum,
   setStandardRowNum,
+  othersColSpan = 5,
   glassDataSet,
   setGlassDataSet,
-  othersColSpan,
-  setOthersColSpan,
+  smlMap,
+  predictMap,
   setDfRatioForLine,
   setDfAvgForBar,
   setSmlAvg,
-  smlMap,
-  predictMap,
+  customColNames = [],
+  setCustomColNames,
+  presetGids,
 }) => {
+  const numCustom = Math.max(0, othersColSpan - 5);
+  const readOnly = !!editable;
 
-  const {
-    defectArr,
-    setDefectArr,
-    // tableData,
-    // setTableData,
-  } = useFma();
+  const [rows, setRows] = useState(() => {
+    return Array.from({ length: standardRowNum }, (_, i) => emptyRow(i, numCustom));
+  });
+  const didInitFromGlassData = useRef(false);
 
+  // 編輯既有資料：用 glassDataSet 初始化一次
+  useEffect(() => {
+    if (didInitFromGlassData.current) return;
+    if (!Array.isArray(glassDataSet) || glassDataSet.length === 0) return;
+    didInitFromGlassData.current = true;
 
-  let initObj = {
-    id: "",
-    date: "",
-    gid: "",
-  };
-
-  defectArr.slice(0, 24).map((e, i) => (initObj[e?.replaceAll("-", "")] = ""));
-  initObj["s"] = "";
-  initObj["m"] = "";
-  initObj["l"] = "";
-  initObj["createdAt"] = "";
-  initObj["updatedAt"] = "";
-  initObj["outlineId"] = "";
-  initObj["otherdf"] = {};
-
-  const initTableData = () => {
-    let initArr = [];
-    for (let i = 0; i < standardRowNum; i++) {
-      // console.log(Object.keys(initObj).length);
-      // let cpObj = { ...initObj };
-      let cpObj = JSON.parse(JSON.stringify(initObj));
-      cpObj.id = i;
-      initArr.push(cpObj);
-    }
-
-    return initArr;
-  };
-
-  // let RowArr = [];
-  let sheetTotal = [];
-  const [actionArr, setActionArr] = useState([]);
-  const [totalNum, setTotalNum] = useState([]);
-  const [avgNum, setAvgNum] = useState([]);
-  const [ratioNum, setRatioNum] = useState([]);
-  const [accRatioNum, setAccRatioNum] = useState([]);
-  let [tableData, setTableData] = useState(initTableData);
-  // setTableData(initTableData);
-  let tableDataRef = useRef(tableData);
-  // const tableKeys = Object.keys(tableDataRef.current[0]);
-  // const removeDash = defectArr.map((x) => x?.replaceAll("-", ""));
-  // 取出tableData keys，除了defect type以外的欄位
-  // const different = tableKeys.filter((x) => !removeDash.includes(x));
-  let savedPosRef = useRef(null);
-  const isComposing = useRef(false);
-  // let queryPage = false;
-
-  let defectArrRef = useRef([]);
-
-  const handleCompositionStart = () => {
-    isComposing.current = true;
-  };
-
-  const handleCompositionEnd = (e, i, dfType, col_n = 0) => {
-    isComposing.current = false;
-    if (!isComposing.current) {
-      // 保持key in數值時游標位置
-      const selection = window.getSelection();
-      // console.log(selection);
-      if (selection.rangeCount > 0) {
-        if (isNaN(selection.getRangeAt(0).commonAncestorContainer.data)) {
-          savedPosRef.current = 0;
-        } else {
-          savedPosRef.current = Number(
-            selection.getRangeAt(0).commonAncestorContainer.data
-          ).toString().length;
-        }
-      }
-      if (dfType !== "otherdf") {
-        setTableData((prevData) => {
-          tableDataRef.current = prevData.map(
-            (item, index) =>
-              index === i
-                ? { ...item, [dfType]: Number(e.target.innerText) }
-                : item
-            // index === i ? { ...item, [dfType]: Number(e.nativeEvent.data) } : item
-          );
-          // console.log(tableDataRef.current);
-          return tableDataRef.current;
+    const mapped = glassDataSet.map((g, i) => {
+      const row = { id: i, sqlId: g.sqlId ?? g.id, gid: g.gid ?? "", s: g.s ?? "", m: g.m ?? "", l: g.l ?? "", otherdf: {} };
+      for (const k of DEFECT_KEYS) row[k] = g[k] ?? "";
+      // otherdf 可能是陣列 [{name:count}] 或已是 { selfDefine_n: {name:count} }
+      const od = g.otherdf;
+      if (Array.isArray(od)) {
+        od.forEach((obj, idx) => {
+          row.otherdf[`selfDefine_${idx + 1}`] = { ...obj };
         });
-      } else {
-        // 自定義defect type輸入數值後寫入tableData
-        const col_head = `selfDefine_${col_n}`;
-        setTableData((prevData) => {
-          tableDataRef.current = prevData.map((item, index) => {
-            if (index === i) {
-              // let cpObj = { ...item };
-              // 嵌套物件使用深拷貝
-              let cpObj = JSON.parse(JSON.stringify(item));
-              const realDfName = Object.keys(cpObj.otherdf[col_head])[0];
-              cpObj.otherdf[col_head][realDfName] = Number(e.target.innerText);
-              // cpObj.otherdf[col_head][realDfName] = Number(e.nativeEvent.data);
-              return cpObj;
-            } else {
-              return item;
-            }
-          });
-          return tableDataRef.current;
-        });
+      } else if (od && typeof od === "object") {
+        row.otherdf = JSON.parse(JSON.stringify(od));
       }
-    }
-  };
-
-  const handleRowDelete = (e) => {
-    // console.log(standardRowNum);
-
-    setStandardRowNum((prev_rowNum) => {
-      if (prev_rowNum > 0) {
-        prev_rowNum = prev_rowNum - 1;
-        // console.log(prev_rowNum);
-        return prev_rowNum;
-      }
-      // console.log(prev);
+      return row;
     });
-    // console.log(standardRowNum);
-    const del_row_id = Number(
-      e.currentTarget.parentElement.parentElement.id.split("-")[2]
-    );
-    // console.log(del_row_id);
+    setRows(mapped);
+    setStandardRowNum?.(mapped.length);
 
-    setTableData((prev) => {
-      // 濾除掉已刪除的欄位
-      prev = prev.filter((e) => e.id !== del_row_id);
-      // console.log(prev);
-
-      // 重設tableData id編號
-      tableDataRef.current = prev.map((item, index) => {
-        let cpItem = { ...item };
-        cpItem.id = index;
-        return cpItem;
-      });
-      return tableDataRef.current;
+    // 還原自訂欄名
+    const names = [];
+    const first = mapped[0]?.otherdf || {};
+    Object.keys(first).forEach((k) => {
+      names.push(Object.keys(first[k])[0] || "");
     });
-  };
+    if (names.length) setCustomColNames?.(names);
+  }, [glassDataSet, setStandardRowNum, setCustomColNames]);
 
-  function sumArr(arr) {
-    return arr.reduce((acc, cur) => acc + cur, 0.0);
-  }
-
-  // Create a python range like function
-  // function Range(size, startNum = 0) {
-  //   return [...Array(size).keys()].filter((i) => i >= startNum);
-  // }
-  // 取得產品欄位(glass id)不為空白的列數
-  function getNotEmptyRowLen() {
-    let countNotEmptyRows = 0;
-    let notEmptyGidRows = document.querySelectorAll(".gid");
-    notEmptyGidRows.forEach((row) => {
-      let gid_row_value = row.innerHTML.replace(/[<]br[^>]*[>]/gi, "");
-      if (gid_row_value !== "") {
-        countNotEmptyRows += 1;
-      }
-    });
-    return countNotEmptyRows;
-  }
-
-  // 算sml加總
-  const calSmlTotal = (item) => {
-    const listItems = [];
-    const smlArr = ["s", "m", "l"];
-    
-    tableData.forEach((e, i) => {
-      if (item === i) {
-        let rowCount = 0;
-        smlArr.forEach((s, i) => {
-          rowCount += Number(e?.[s]);
-        });
-        sheetTotal.push(rowCount);
-        // console.log(sheetTotal);
-
-        // setDfAvgForBar(rowCount);
-        listItems.push(
-          <td key={`df-sum-${i}`} className="df-sum">
-            {rowCount}
-          </td>
+  // 「新增項次 / 刪列」→ 對齊 standardRowNum
+  useEffect(() => {
+    setRows((prev) => {
+      if (prev.length === standardRowNum) return prev;
+      if (prev.length < standardRowNum) {
+        const extra = Array.from({ length: standardRowNum - prev.length }, (_, i) =>
+          emptyRow(prev.length + i, numCustom)
         );
+        return [...prev, ...extra];
       }
+      return prev.slice(0, standardRowNum).map((r, i) => ({ ...r, id: i }));
     });
-    return listItems;
-  };
+  }, [standardRowNum, numCustom]);
 
-  const changeCellValue = (e, i, dfType, col_n = 0) => {
-    if (!isComposing.current) {
-      // 保持key in數值時游標位置
-      const selection = window.getSelection();
-      // console.log(selection);
-      if (selection.rangeCount > 0) {
-        if (isNaN(selection.getRangeAt(0).commonAncestorContainer.data)) {
-          savedPosRef.current = 0;
-        } else {
-          savedPosRef.current = Number(
-            selection.getRangeAt(0).commonAncestorContainer.data
-          ).toString().length;
+  // 「新增欄位」→ 對齊自訂欄數
+  useEffect(() => {
+    setRows((prev) =>
+      prev.map((r) => {
+        const od = { ...r.otherdf };
+        for (let c = 1; c <= numCustom; c += 1) {
+          if (!od[`selfDefine_${c}`]) od[`selfDefine_${c}`] = { "": "" };
         }
-      }
-      if (dfType !== "otherdf") {
-        setTableData((prevData) => {
-          tableDataRef.current = prevData.map(
-            (item, index) =>
-              index === i
-                ? { ...item, [dfType]: Number(e.target.innerText) }
-                : item
-            // index === i ? { ...item, [dfType]: Number(e.nativeEvent.data) } : item
-          );
-          return tableDataRef.current;
+        Object.keys(od).forEach((k) => {
+          const idx = Number(k.split("_")[1]);
+          if (idx > numCustom) delete od[k];
         });
-      } else {
-        // 自定義defect type輸入數值後寫入tableData
-        const col_head = `selfDefine_${col_n}`;
-        setTableData((prevData) => {
-          tableDataRef.current = prevData.map((item, index) => {
-            if (index === i) {
-              // let cpObj = { ...item };
-              // 嵌套物件使用深拷貝
-              let cpObj = JSON.parse(JSON.stringify(item));
-              const realDfName = Object.keys(cpObj.otherdf[col_head])[0];
-              cpObj.otherdf[col_head][realDfName] = Number(e.target.innerText);
-              // cpObj.otherdf[col_head][realDfName] = Number(e.nativeEvent.data);
-              return cpObj;
-            } else {
-              return item;
-            }
-          });
+        return { ...r, otherdf: od };
+      })
+    );
+  }, [numCustom]);
 
-          return tableDataRef.current;
-        });
-      }
-    }
-  };
-
-  // Handle focus/selection restoration
+  // 一鍵帶入示範 Glass ID（demo 引導用；presetGids 每次點擊都是新陣列所以會重跑）
   useEffect(() => {
-    if (savedPosRef.current !== null) {
-      const selection = window.getSelection();
-      if (selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        // console.log(range);
-        if (range.endOffset == 0) {
-          // console.log(range.endOffset);
-          try {
-            range.setStart(range.startContainer, savedPosRef.current);
-            range.collapse(false);
-            selection.removeAllRanges();
-            selection.addRange(range);
-            savedPosRef.current = null;
-          } catch (e) {
-            console.log(e);
-          }
-        }
-      }
-    }
-  }, [savedPosRef.current]);
-
-  useEffect(() => {
-    if (glassDataSet && tableData.length === 0) {
-      const addCol = glassDataSet[0].otherdf;
-      if (addCol.length > 0 && othersColSpan === 5) {
-        setOthersColSpan(othersColSpan + addCol.length);
-      }
-      setStandardRowNum(glassDataSet.length);
-      // console.log(glassDataSet);
-      
-      // 僅初始化將glassDataSet帶入TableData
-      tableDataRef.current = glassDataSet.map((e, i) => {
-        let addColArr = {};
-        for (let col_n = 0; col_n < addCol.length; col_n++) {
-          const define_name = `selfDefine_${col_n + 1}`;
-          const define_obj = { [define_name]: e.otherdf[col_n] };
-          addColArr = { ...addColArr, ...define_obj };
-        }
-        e.otherdf = addColArr;
-        return e;
-      });
-      
-      setTableData(tableDataRef.current);
-
-      // 重設tableData id編號
-      setTableData((prev) => {
-        // 重設tableData id編號
-        tableDataRef.current = prev.map((item, index) => {
-          // let cpItem = JSON.parse(JSON.stringify(item));
-          let cpItem = structuredClone(item);
-          cpItem.sqlId = cpItem.id;
-          cpItem.id = index;
-          return cpItem;
-        });
-        // console.log(tableDataRef.current);
-
-        return tableDataRef.current;
-      });
-    }
-    // tableData內資料變更時，回寫glassDataSet，for query網頁資料更新
-    if (glassDataSet) {
-      setGlassDataSet(tableDataRef.current);
-    }
-
-    // 處理新增項次
-    if (tableDataRef.current?.length < standardRowNum) {
-      let cpObj;
-      if (othersColSpan > 5) {
-        let addColNum = othersColSpan - 5;
-        let addColArr = {};
-        let define_obj;
-        for (let col_n = 0; col_n < addColNum; col_n++) {
-          const define_name = `selfDefine_${col_n + 1}`;
-          let real_df_obj = {};
-          real_df_obj[defectArr[24 + col_n]] = "";
-          define_obj = { [define_name]: real_df_obj };
-          addColArr = { ...addColArr, ...define_obj };
-        }
-        cpObj = { ...initObj, otherdf: addColArr };
-      } else {
-        cpObj = { ...initObj };
-      }
-
-      cpObj.id = tableDataRef.current.length;
-      tableDataRef.current.push(cpObj);
-      setTableData(tableDataRef.current);
-    }
-
-    // 計算Total Num, Avg Num, rario, acc-ratio
-    let totalNumArr = [];
-    let avgNumArr = [];
-    let ratioNumArr = [];
-    let accRatioNumArr = [];
-    let defectTypeArr = [];
-    // 新增defect欄位存入defectTypeArr array
-    if (othersColSpan > 5 && tableDataRef.current.length > 0) {
-      const selfDefObjs = Object.values(tableDataRef.current[0].otherdf);
-      // console.log(selfDefObjs);
-      const uniSelfDef = new Set();
-      selfDefObjs.forEach((element) => {
-        uniSelfDef.add(Object.keys(element)[0]?.replace(/\n/g, ""));
-      });
-      // console.log(uniSelfDef);
-      defectTypeArr = [...defectArr.slice(0, 24), ...uniSelfDef];
-      // console.log(defectTypeArr);
-      setDefectArr(defectTypeArr);
-    }
-
-    for (let j = 0; j < defectArr.length; j++) {
-      let dfSum = 0;
-      let dfAvg = 0.0;
-      let dfType = defectArr[j];
-
-      for (let i = 0; i < tableDataRef.current?.length; i++) {
-        if (j < 24) {
-          // console.log(defectArr.length);
-          dfType = dfType.replaceAll("-", "");
-          dfSum += Number(tableDataRef.current[i][dfType]);
-        } else {
-          // 計算新增欄位的total Num、Avg Num
-          if (Object.keys(tableDataRef.current[i].otherdf).length > 0) {
-            dfSum += Number(
-              tableDataRef.current[i].otherdf[`selfDefine_${j - 23}`][
-                defectArr[j]
-              ]
-            );
-          }
-        }
-        if (getNotEmptyRowLen() > 0) {
-          dfAvg = isNaN(dfSum / getNotEmptyRowLen())
-            ? 0.0
-            : dfSum / getNotEmptyRowLen();
-        }
-      }
-      totalNumArr.push(dfSum);
-      avgNumArr.push(dfAvg);
-    }
-
-    // set total num row data and avg num row data
-    setSmlAvg((sumArr(sheetTotal) / getNotEmptyRowLen())?.toFixed(1));
-    setTotalNum(totalNumArr);
-    setAvgNum(avgNumArr);
-    setDfAvgForBar([...avgNumArr]);
-    // 設定百分比row data
-    let dfRatio;
-    for (let j = 0; j < defectArr.length; j++) {
-      dfRatio = totalNumArr[j] / sumArr(totalNumArr);
-      ratioNumArr.push(dfRatio);
-    }
-    setRatioNum(ratioNumArr);
-    setDfRatioForLine([...ratioNumArr]);
-    let accRatio = 0.0;
-    ratioNumArr.reduce((acc, cur) => {
-      accRatio += cur;
-      accRatioNumArr.push(accRatio);
-    }, 0.0);
-    setAccRatioNum(accRatioNumArr);
-    // console.log(tableData);
-    // console.log(glassDataSet);
-    
-    
-  }, [glassDataSet, tableData, standardRowNum, othersColSpan]);
-
-  // 新增欄位
-  useEffect(() => {
-    // console.log(totalNum);
-    if (!glassDataSet) {
-      for (let i = 0; i < tableDataRef.current?.length; i++) {
-        if (othersColSpan > 5) {
-          const defaultColName = "selfDefine_" + (othersColSpan - 5);
-          tableDataRef.current[i]["otherdf"][defaultColName] = {};
-        }
-      }
-      setTableData(tableDataRef.current);
-      // setTotalNum([...totalNum, 0]);
-    }
-  }, [othersColSpan]);
-
-  useEffect(() => {
-    defectArrRef.current = defectArr;
-  }, [defectArr]);
-
-  useEffect(() => {
-    if (!smlMap || Object.keys(smlMap).length === 0) return;
-    setTableData((prev) => {
-      tableDataRef.current = prev.map((item) => {
-        const sml = smlMap[item.gid];
-        if (sml) {
-          return { ...item, s: sml.s ?? item.s, m: sml.m ?? item.m, l: sml.l ?? item.l };
-        }
-        return item;
-      });
-      return tableDataRef.current;
+    if (!Array.isArray(presetGids) || presetGids.length === 0) return;
+    setStandardRowNum?.((n) => Math.max(n, presetGids.length));
+    setRows((prev) => {
+      const next = [...prev];
+      while (next.length < presetGids.length) next.push(emptyRow(next.length, numCustom));
+      return next.map((r, i) => (i < presetGids.length ? { ...r, gid: presetGids[i] } : r));
     });
-  }, [smlMap]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presetGids]);
 
-  const DEFECT_FIELDS = [
-    "runder","gunder","bunder","bmwp","rwp","gwp","bwp",
-    "rgel","ggel","bgel","rresistsmall","gresistsmall","bresistsmall",
-    "rfiber","gfiber","bfiber","bp","bmdirty","repair",
-    "abovep","backdirty","dirty","ovendrop","black",
-  ];
-
+  // YOLO 預填：pred 有值、且該列還沒被填過才套用
   useEffect(() => {
     if (!predictMap || Object.keys(predictMap).length === 0) return;
-    setTableData((prev) => {
-      tableDataRef.current = prev.map((item) => {
-        if (!item.gid) return item;
-        const predicted = predictMap[item.gid];
-        if (!predicted) return item;
-        // 若該 row 已有 user 填入的 defect 資料，跳過不覆蓋
-        const hasUserData = DEFECT_FIELDS.some((f) => {
-          const v = item[f];
-          return v !== "" && Number(v) > 0;
-        });
-        if (hasUserData) return item;
-        return { ...item, ...predicted };
-      });
-      return tableDataRef.current;
-    });
+    setRows((prev) =>
+      prev.map((r) => {
+        const pred = r.gid && predictMap[r.gid];
+        if (!pred) return r;
+        const already = DEFECT_KEYS.some((k) => num(r[k]) > 0);
+        if (already) return r;
+        return { ...r, ...pred };
+      })
+    );
   }, [predictMap]);
 
-  // useEffect(()=>{
-  //   if (tableData.length == 0) {
-  //     setTableData(initTableData);
-  //   }
-  // },[])
+  // 影像複判帶回的 S/M/L
+  useEffect(() => {
+    if (!smlMap || Object.keys(smlMap).length === 0) return;
+    setRows((prev) =>
+      prev.map((r) => {
+        const sml = r.gid && smlMap[r.gid];
+        return sml ? { ...r, s: sml.s ?? r.s, m: sml.m ?? r.m, l: sml.l ?? r.l } : r;
+      })
+    );
+  }, [smlMap]);
+
+  const setCell = (rowIdx, key, value) => {
+    setRows((prev) => prev.map((r, i) => (i === rowIdx ? { ...r, [key]: value } : r)));
+  };
+  const setCustomCell = (rowIdx, col, value) => {
+    setRows((prev) =>
+      prev.map((r, i) => {
+        if (i !== rowIdx) return r;
+        const od = JSON.parse(JSON.stringify(r.otherdf));
+        const name = Object.keys(od[`selfDefine_${col}`] || { "": "" })[0] || "";
+        od[`selfDefine_${col}`] = { [name]: value };
+        return { ...r, otherdf: od };
+      })
+    );
+  };
+  const renameCustomCol = (col, name) => {
+    setCustomColNames?.(
+      Array.from({ length: numCustom }, (_, i) => (i + 1 === col ? name : customColNames[i] || ""))
+    );
+    setRows((prev) =>
+      prev.map((r) => {
+        const od = JSON.parse(JSON.stringify(r.otherdf));
+        const prevVal = Object.values(od[`selfDefine_${col}`] || { "": "" })[0] ?? "";
+        od[`selfDefine_${col}`] = { [name]: prevVal };
+        return { ...r, otherdf: od };
+      })
+    );
+  };
+  const deleteRow = (rowIdx) => {
+    setStandardRowNum?.((n) => Math.max(0, n - 1));
+    setRows((prev) => prev.filter((_, i) => i !== rowIdx).map((r, i) => ({ ...r, id: i })));
+  };
+
+  const filledRows = rows.filter((r) => String(r.gid).trim().length > 0);
+  const rowDefectTotal = (r) =>
+    sum(DEFECT_KEYS.map((k) => num(r[k]))) +
+    sum(Object.values(r.otherdf || {}).map((o) => num(Object.values(o)[0])));
+  const rowSmlTotal = (r) => num(r.s) + num(r.m) + num(r.l);
+
+  // 表尾統計 + 對外回呼
+  // ⚠️ 長度必須恆等於「12 + numCustom」，跟表頭/表身一致，否則表尾各列 <td> 數對不上、欄位錯位。
+  // 自訂欄還沒命名時 customColNames 可能比 numCustom 短，用暫定名補齊。
+  const colLabels = useMemo(
+    () => [
+      ...DEFECT_LABELS,
+      ...Array.from({ length: numCustom }, (_, i) => customColNames[i] || `自訂${i + 1}`),
+    ],
+    [customColNames, numCustom]
+  );
+  const stats = useMemo(() => {
+    const totals = colLabels.map((_, ci) =>
+      sum(
+        rows.map((r) => {
+          if (ci < DEFECT_KEYS.length) return num(r[DEFECT_KEYS[ci]]);
+          const key = `selfDefine_${ci - DEFECT_KEYS.length + 1}`;
+          return num(Object.values(r.otherdf?.[key] || {})[0]);
+        })
+      )
+    );
+    const denom = Math.max(1, filledRows.length);
+    const avgs = totals.map((t) => t / denom);
+    const grand = sum(totals) || 1;
+    const ratios = totals.map((t) => t / grand);
+    let acc = 0;
+    const accRatios = ratios.map((r) => (acc += r));
+    return { totals, avgs, ratios, accRatios };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, colLabels, numCustom]);
+
+  useEffect(() => {
+    setGlassDataSet?.(rows);
+    // ⚠️ 傳複本，不要把 stats 內的陣列本體交出去 —— 下游若就地排序/截斷
+    // （FmaEchartElement 舊版就是這樣做），表尾的 Avg Num / 百分比(%) 兩列會被毀掉。
+    setDfAvgForBar?.([...stats.avgs]);
+    setDfRatioForLine?.([...stats.ratios]);
+    const smlTotals = filledRows.map(rowSmlTotal);
+    setSmlAvg?.((sum(smlTotals) / Math.max(1, filledRows.length)).toFixed(1));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, stats]);
+
+  const cellInput = (value, onChange) => (
+    <input
+      type="number"
+      min="0"
+      className="fma-cell-input"
+      value={value === 0 ? "0" : value}
+      disabled={readOnly}
+      onChange={(e) => onChange(e.target.value === "" ? "" : Number(e.target.value))}
+    />
+  );
 
   return (
     <div className="fma-result-input">
-      <table
-        className="fma-table"
-        style={{ tableLayout: "auto", width: "100%" }}
-      >
+      <table className="fma-table">
+        <colgroup>
+          <col className="col-item" />
+          <col className="col-gid" />
+          {colLabels.map((_, i) => (
+            <col key={`cd-${i}`} className="col-df" />
+          ))}
+          <col className="col-total" />
+          <col className="col-cal" />
+          <col className="col-cal" />
+          <col className="col-cal" />
+          <col className="col-total" />
+          <col className="col-trash" />
+        </colgroup>
         <thead>
           <tr>
-            <th rowSpan="3" style={{ width: "2vw" }}>
-              項次
-            </th>
-            <th rowSpan="2" style={{ width: "2vw" }}>
-              產品/Glass
-            </th>
-            <th colSpan={(24 + othersColSpan - 5).toString()}>Defect Type</th>
-            <th rowSpan="2">FMA Total</th>
-            <th colSpan="4" rowSpan="2" className="df-cal">
-              Sheet Data
-            </th>
+            <th rowSpan={2}>項次</th>
+            <th rowSpan={2}>{product || "產品/Glass"}</th>
+            <th colSpan={colLabels.length}>Defect Type</th>
+            <th>FMA Total</th>
+            <th className="df-cal" colSpan={4}>Sheet Data</th>
+            {/* 垃圾桶欄刻意不給表頭（與私有版一致），由 colgroup 的 col-trash 決定寬度 */}
           </tr>
           <tr>
-            <th colSpan="3">異物</th>
-            <th colSpan="4">WP</th>
-            <th colSpan="3">殘膠</th>
-            <th colSpan="3">微小異物</th>
-            <th colSpan="3">纖維</th>
-            <th colSpan="3">前程</th>
-            <th colSpan={othersColSpan.toString()}>其他</th>
-          </tr>
-          <tr>
-            <th
-              //   contentEditable="true"
-              style={{ width: "10vw" }}
-              className="edit-color"
-            >
-              {product}
-            </th>
-            <th style={{ width: "2.5vw" }}>R</th>
-            <th style={{ width: "2.5vw" }}>G</th>
-            <th style={{ width: "2.5vw" }}>B</th>
-            <th style={{ width: "2.5vw" }}>BM</th>
-            <th style={{ width: "2.5vw" }}>R</th>
-            <th style={{ width: "2.5vw" }}>G</th>
-            <th style={{ width: "2.5vw" }}>B</th>
-            <th style={{ width: "2.5vw" }}>R</th>
-            <th style={{ width: "2.5vw" }}>G</th>
-            <th style={{ width: "2.5vw" }}>B</th>
-            <th style={{ width: "2.5vw" }}>R</th>
-            <th style={{ width: "2.5vw" }}>G</th>
-            <th style={{ width: "2.5vw" }}>B</th>
-            <th style={{ width: "2.5vw" }}>R</th>
-            <th style={{ width: "2.5vw" }}>G</th>
-            <th style={{ width: "2.5vw" }}>B</th>
-            <th style={{ width: "2.5vw" }}>BP</th>
-            <th style={{ width: "4vw" }}>BM髒汙</th>
-            <th style={{ width: "4vw" }}>修正痕</th>
-            <th style={{ width: "2.5vw" }}>膜上</th>
-            <th style={{ width: "2.5vw" }}>背汙</th>
-            <th style={{ width: "2.5vw" }}>髒汙</th>
-            <th style={{ width: "2.5vw" }}>氣泡</th>
-            <th style={{ width: "3.5vw" }}>黑色系</th>
-            {(() => {
-              const itemList = [];
-              const addColNum = othersColSpan - 5;
-              for (let i = 1; i <= addColNum; i++) {
-                itemList.push(
-                  <th
-                    key={`add-col-td-${i}`}
-                    style={{ width: "2.5vw" }}
-                    className={`selfDefine_${i}`}
-                    contentEditable={!editable}
-                    suppressContentEditableWarning
-                    // 新增欄位new defect type寫入tableData.otherdf以物件方式儲存
-                    // 儲存格式: { selfDefine_i: { newDefect: '' } }
-                    // values={
-                    //   defectArr.length > 24 ? defectArr[24 + i] : ""
-                    // }
-                    // defaultValue={defectArr[24 + i - 1]}
-                    onBlur={(e) => {
-                      const newDfType = e.target.innerText;
-                      if (newDfType.length > 0) {
-                        const preDefine = `selfDefine_${i}`;
-                        setTableData((prevData) => {
-                          tableDataRef.current = prevData.map((item) => {
-                            let define_obj = item.otherdf;
-                            define_obj[preDefine] = {};
-                            define_obj[preDefine][newDfType] = "";
-                            return { ...item, otherdf: define_obj };
-                          });
-                          return tableDataRef.current;
-                        });
-                      }
-                    }}
-                  >
-                    {defectArr.length > 24 && defectArr[24 + i - 1]}
-                  </th>
-                );
-              }
-              return itemList;
-            })()}
-            <th style={{ width: "3.5vw" }}>單枚總和</th>
-            <th className="df-cal" style={{ width: "3vw" }}>
-              S
-            </th>
-            <th className="df-cal" style={{ width: "3vw" }}>
-              M
-            </th>
-            <th className="df-cal" style={{ width: "3vw" }}>
-              L
-            </th>
+            {DEFECT_LABELS.map((lab) => (
+              <th key={lab}>{lab}</th>
+            ))}
+            {Array.from({ length: numCustom }, (_, i) => (
+              <th key={`cc-${i}`}>
+                <input
+                  className="fma-cell-input"
+                  placeholder={`自訂${i + 1}`}
+                  value={customColNames[i] || ""}
+                  disabled={readOnly}
+                  onChange={(e) => renameCustomCol(i + 1, e.target.value)}
+                />
+              </th>
+            ))}
+            <th>單枚總和</th>
+            <th className="df-cal">S</th>
+            <th className="df-cal">M</th>
+            <th className="df-cal">L</th>
             <th className="df-cal">Total</th>
           </tr>
         </thead>
-        <tbody id="fma-tbody">
-          {/* IIF Create default columns */}
-          {(() => {
-            // const standardRowNum = 5;
-            const listItems = [];
-            for (let i = 0; i < tableData?.length; i++) {
-              let row_id = "df-row-";
-              row_id = row_id + `${i}`;
-              listItems.push(
-                <tr className="df-row" key={i} id={row_id}>
-                  <td className="item">{i + 1}</td>
-                  <td
-                    className="gid edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    // onBlur={(e) => {
-                    // onInput={(e) => {
-                    onInput={(e) => {
-                      // Save cursor position
-                      const selection = window.getSelection();
-                      if (selection.rangeCount > 0) {
-                        savedPosRef.current =
-                          selection.getRangeAt(0).startOffset;
-                      }
-                      setTableData((prevData) => {
-                        tableDataRef.current = prevData.map((item, id) =>
-                          id === i ? { ...item, gid: e.target.innerText } : item
-                        );
-                        return tableDataRef.current;
-                      });
-                    }}
-                  >
-                    {tableData.length > 0 && tableData[i].gid}
-                  </td>
-                  <td
-                    // ref={savedPosRef}
-                    // values={(e) => tableDataRef.current[i]["runder"]}
-                    className="r-under edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) =>
-                      handleCompositionEnd(e, i, "runder")
-                    }
-                    onInput={(e) => changeCellValue(e, i, "runder")}
-                  >
-                    {tableData.length > 0 && tableData[i].runder}
-                  </td>
-                  <td
-                    className="g-under edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) =>
-                      handleCompositionEnd(e, i, "gunder")
-                    }
-                    onInput={(e) => changeCellValue(e, i, "gunder")}
-                  >
-                    {tableData.length > 0 && tableData[i].gunder}
-                  </td>
-                  <td
-                    className="b-under edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) =>
-                      handleCompositionEnd(e, i, "bunder")
-                    }
-                    onInput={(e) => changeCellValue(e, i, "bunder")}
-                  >
-                    {tableData.length > 0 && tableData[i].bunder}
-                  </td>
-                  <td
-                    className="bm-wp edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) => handleCompositionEnd(e, i, "bmwp")}
-                    onInput={(e) => changeCellValue(e, i, "bmwp")}
-                  >
-                    {tableData.length > 0 && tableData[i].bmwp}
-                  </td>
-                  <td
-                    className="r-wp edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) => handleCompositionEnd(e, i, "rwp")}
-                    onInput={(e) => changeCellValue(e, i, "rwp")}
-                  >
-                    {tableData.length > 0 && tableData[i].rwp}
-                  </td>
-                  <td
-                    className="g-wp edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) => handleCompositionEnd(e, i, "gwp")}
-                    onInput={(e) => changeCellValue(e, i, "gwp")}
-                  >
-                    {tableData.length > 0 && tableData[i].gwp}
-                  </td>
-                  <td
-                    className="b-wp edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) => handleCompositionEnd(e, i, "bwp")}
-                    onInput={(e) => changeCellValue(e, i, "bwp")}
-                  >
-                    {tableData.length > 0 && tableData[i].bwp}
-                  </td>
-                  <td
-                    className="r-gel edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) => handleCompositionEnd(e, i, "rgel")}
-                    onInput={(e) => changeCellValue(e, i, "rgel")}
-                  >
-                    {tableData.length > 0 && tableData[i].rgel}
-                  </td>
-                  <td
-                    className="g-gel edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) => handleCompositionEnd(e, i, "ggel")}
-                    onInput={(e) => changeCellValue(e, i, "ggel")}
-                  >
-                    {tableData.length > 0 && tableData[i].ggel}
-                  </td>
-                  <td
-                    className="b-gel edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) => handleCompositionEnd(e, i, "bgel")}
-                    onInput={(e) => changeCellValue(e, i, "bgel")}
-                  >
-                    {tableData.length > 0 && tableData[i].bgel}
-                  </td>
-                  <td
-                    // className="r-dev-abnormal edit-color"
-                    className="r-resist-small edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) =>
-                      // handleCompositionEnd(e, i, "rdevabnormal")
-                      handleCompositionEnd(e, i, "rresistsmall")
-                    }
-                    // onInput={(e) => changeCellValue(e, i, "rdevabnormal")}
-                    onInput={(e) => changeCellValue(e, i, "rresistsmall")}
-                  >
-                    {tableData.length > 0 && tableData[i].rresistsmall}
-                  </td>
-                  <td
-                    className="g-resist-small edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) =>
-                      handleCompositionEnd(e, i, "gresistsmall")
-                    }
-                    onInput={(e) => changeCellValue(e, i, "gresistsmall")}
-                  >
-                    {tableData.length > 0 && tableData[i].gresistsmall}
-                  </td>
-                  <td
-                    className="b-resist-small edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) =>
-                      handleCompositionEnd(e, i, "bresistsmall")
-                    }
-                    onInput={(e) => changeCellValue(e, i, "bresistsmall")}
-                  >
-                    {tableData.length > 0 && tableData[i].bresistsmall}
-                  </td>
-                  <td
-                    className="r-fiber edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) =>
-                      handleCompositionEnd(e, i, "rfiber")
-                    }
-                    onInput={(e) => changeCellValue(e, i, "rfiber")}
-                  >
-                    {tableData.length > 0 && tableData[i].rfiber}
-                  </td>
-                  <td
-                    className="g-fiber edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) =>
-                      handleCompositionEnd(e, i, "gfiber")
-                    }
-                    onInput={(e) => changeCellValue(e, i, "gfiber")}
-                  >
-                    {tableData.length > 0 && tableData[i].gfiber}
-                  </td>
-                  <td
-                    className="b-fiber edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) =>
-                      handleCompositionEnd(e, i, "bfiber")
-                    }
-                    onInput={(e) => changeCellValue(e, i, "bfiber")}
-                  >
-                    {tableData.length > 0 && tableData[i].bfiber}
-                  </td>
-                  <td
-                    className="bp edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) => handleCompositionEnd(e, i, "bp")}
-                    onInput={(e) => changeCellValue(e, i, "bp")}
-                  >
-                    {tableData.length > 0 && tableData[i].bp}
-                  </td>
-                  <td
-                    className="bm-dirty edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) =>
-                      handleCompositionEnd(e, i, "bmdirty")
-                    }
-                    onInput={(e) => changeCellValue(e, i, "bmdirty")}
-                  >
-                    {tableData.length > 0 && tableData[i].bmdirty}
-                  </td>
-                  <td
-                    className="repair edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) =>
-                      handleCompositionEnd(e, i, "repair")
-                    }
-                    onInput={(e) => changeCellValue(e, i, "repair")}
-                  >
-                    {tableData.length > 0 && tableData[i].repair}
-                  </td>
-                  <td
-                    className="above-p edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) =>
-                      handleCompositionEnd(e, i, "abovep")
-                    }
-                    onInput={(e) => changeCellValue(e, i, "abovep")}
-                  >
-                    {tableData.length > 0 && tableData[i].abovep}
-                  </td>
-                  <td
-                    className="back-dirty edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) =>
-                      handleCompositionEnd(e, i, "backdirty")
-                    }
-                    onInput={(e) => changeCellValue(e, i, "backdirty")}
-                  >
-                    {tableData.length > 0 && tableData[i].backdirty}
-                  </td>
-                  <td
-                    className="dirty edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) =>
-                      handleCompositionEnd(e, i, "dirty")
-                    }
-                    onInput={(e) => changeCellValue(e, i, "dirty")}
-                  >
-                    {tableData.length > 0 && tableData[i].dirty}
-                  </td>
-                  <td
-                    className="oven-drop edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) =>
-                      handleCompositionEnd(e, i, "ovendrop")
-                    }
-                    onInput={(e) => changeCellValue(e, i, "ovendrop")}
-                  >
-                    {tableData.length > 0 && tableData[i].ovendrop}
-                  </td>
-                  <td
-                    className="black edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) =>
-                      handleCompositionEnd(e, i, "black")
-                    }
-                    onInput={(e) => changeCellValue(e, i, "black")}
-                  >
-                    {tableData.length > 0 && tableData[i].black}
-                  </td>
-                  {/* Glass Data新增defect type欄位 */}
-                  {(() => {
-                    const itemList = [];
-                    const addColNum = othersColSpan - 5;
-                    for (let col_num = 1; col_num <= addColNum; col_num++) {
-                      itemList.push(
-                        <td
-                          key={`add-col-td-${i}-${col_num}`}
-                          style={{ width: "2.5vw" }}
-                          // className="edit-color"
-                          className={`selfDefine_${col_num} edit-color`}
-                          contentEditable={!editable}
-                          suppressContentEditableWarning
-                          onCompositionStart={handleCompositionStart}
-                          onCompositionEnd={(e) =>
-                            handleCompositionEnd(e, i, "otherdf", col_num)
-                          }
-                          onInput={(e) =>
-                            changeCellValue(e, i, "otherdf", col_num)
-                          }
-                        >
-                          {othersColSpan > 5 &&
-                            Object.keys(tableData[i].otherdf).length > 0 &&
-                            tableData[i].otherdf[`selfDefine_${col_num}`] &&
-                            tableData[i].otherdf[`selfDefine_${col_num}`][
-                              defectArr[24 + col_num - 1]
-                            ]}
-                        </td>
-                      );
-                    }
-                    return itemList;
-                  })()}
-                  {/* Calculate FMA total */}
-                  {(() => {
-                    let itemList = [];
-                    // console.log(tableData);
-                    // console.log(defectArr);
 
-                    tableData.forEach((e, id) => {
-                      if (id === i) {
-                        // let dfRowArr = [];
-                        let dfCount = 0;
-                        for (let j = 0; j < defectArr.length; j++) {
-                          let defType = defectArr[j];
-                          if (j < 24) {
-                            defType = defType?.replaceAll("-", "");
-                            dfCount += Number(e?.[defType]);
-                          } else {
-                            if (Object.keys(e.otherdf).length > 0) {
-                              dfCount += Number(
-                                e?.otherdf[`selfDefine_${j - 23}`][defectArr[j]]
-                              );
-                            }
-                          }
-                        }
-                        itemList.push(
-                          <td key={`fma-total-${i}`} className="fma-total">
-                            {dfCount}
-                          </td>
-                        );
-                      }
-                    });
-                    return itemList;
-                  })()}
-                  <td
-                    className="s edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) => handleCompositionEnd(e, i, "s")}
-                    onInput={(e) => changeCellValue(e, i, "s")}
-                  >
-                    {tableData.length > 0 && tableData[i].s}
+        <tbody>
+          {rows.map((r, i) => (
+            <tr className="df-row" key={r.id}>
+              <td className="item">{i + 1}</td>
+              <td className="gid">
+                <input
+                  className="fma-cell-input"
+                  value={r.gid}
+                  disabled={readOnly}
+                  onChange={(e) => setCell(i, "gid", e.target.value)}
+                />
+              </td>
+              {DEFECT_KEYS.map((k) => (
+                <td key={k} className="edit-color">
+                  {cellInput(r[k], (v) => setCell(i, k, v))}
+                </td>
+              ))}
+              {Array.from({ length: numCustom }, (_, c) => {
+                const val = Object.values(r.otherdf?.[`selfDefine_${c + 1}`] || {})[0] ?? "";
+                return (
+                  <td key={`c-${c}`} className="edit-color">
+                    {cellInput(val, (v) => setCustomCell(i, c + 1, v))}
                   </td>
-                  <td
-                    className="m edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) => handleCompositionEnd(e, i, "m")}
-                    onInput={(e) => changeCellValue(e, i, "m")}
-                  >
-                    {tableData.length > 0 && tableData[i].m}
-                  </td>
-                  <td
-                    className="l edit-color"
-                    suppressContentEditableWarning
-                    contentEditable={!editable}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={(e) => handleCompositionEnd(e, i, "l")}
-                    onInput={(e) => changeCellValue(e, i, "l")}
-                  >
-                    {tableData.length > 0 && tableData[i].l}
-                  </td>
-                  {/* <td className="df-sum">{calSmlTotal(i)}</td> */}
-                  {calSmlTotal(i)}
-                  <td
-                    style={{
-                      borderTopStyle: "hidden",
-                      borderRightStyle: "hidden",
-                      borderBottomStyle: "hidden",
-                      padding: "0.2rem 0rem 0rem 0.2rem",
-                      width: "2rem",
-                    }}
-                  >
-                    <button
-                      disabled={editable}
-                      onClick={handleRowDelete}
-                      className="trash-button"
-                      style={{
-                        border: "none",
-                        cursor: "pointer",
-                        background: "rgba(255,255,255,0)",
-                      }}
-                    >
-                      <FaTrashAlt className="trash-button-icon" />
-                    </button>
-                  </td>
-                </tr>
-              );
-            }
-            return listItems;
-          })()}
+                );
+              })}
+              <td className="fma-total">{rowDefectTotal(r)}</td>
+              <td className="edit-color">{cellInput(r.s, (v) => setCell(i, "s", v))}</td>
+              <td className="edit-color">{cellInput(r.m, (v) => setCell(i, "m", v))}</td>
+              <td className="edit-color">{cellInput(r.l, (v) => setCell(i, "l", v))}</td>
+              <td className="df-sum">{rowSmlTotal(r)}</td>
+              <td style={{ border: "none" }}>
+                <button
+                  type="button"
+                  className="trash-button"
+                  disabled={readOnly}
+                  onClick={() => deleteRow(i)}
+                  style={{ border: "none", background: "transparent", cursor: "pointer" }}
+                >
+                  <FaTrashAlt className="trash-button-icon" />
+                </button>
+              </td>
+            </tr>
+          ))}
         </tbody>
+
         <tfoot>
           <tr className="total-num">
-            <td colSpan="2">Total Num</td>
-            {totalNum.map((e, i) => {
-              return (
-                <td key={`total-num-${i}`} className="df-total-num">
-                  {e}
-                </td>
-              );
-            })}
-            {/* Total Num計算單枚總和 */}
-            {<td className="df-total-all">{sumArr(totalNum)}</td>}
-            {/* Avg of s-m-l data */}
-            <td className="s-m-l-sum" colSpan={3}>
-              Avg.
-            </td>
+            <td colSpan={2}>Total Num</td>
+            {stats.totals.map((t, i) => (
+              <td key={i} className="df-total-num">{t}</td>
+            ))}
+            <td className="df-total-all">{sum(stats.totals)}</td>
+            <td className="s-m-l-sum" colSpan={3}>Avg.</td>
             <td className="s-m-l-sum">
-              {(sumArr(sheetTotal) / getNotEmptyRowLen()).toFixed(1)}
+              {(sum(filledRows.map(rowSmlTotal)) / Math.max(1, filledRows.length)).toFixed(1)}
             </td>
           </tr>
           <tr className="avg-num">
-            <td colSpan="2">Avg Num</td>
-            {avgNum.map((e, i) => {
-              return (
-                <td key={`avg-num-${i}`} className="df-avg-num">
-                  {e.toFixed(1).toString()}
-                </td>
-              );
-            })}
-            {/* Avg Num計算單枚總和 */}
-            {
-              <td className="fma-avg-all">
-                {sumArr(avgNum).toFixed(1).toString()}
-              </td>
-            }
+            <td colSpan={2}>Avg Num</td>
+            {stats.avgs.map((a, i) => (
+              <td key={i} className="df-avg-num">{a.toFixed(1)}</td>
+            ))}
+            <td className="fma-avg-all">{sum(stats.avgs).toFixed(1)}</td>
           </tr>
           <tr className="df-ratio">
-            <td colSpan="2">百分比(%)</td>
-            {ratioNum.map((e, i) => {
-              return (
-                <td key={`df-ratio-${i}`} className="df-ratio-num">
-                  {(e * 100).toFixed(0).toString()}
-                </td>
-              );
-            })}
-            {/* 百分比計算單枚總和 */}
-            {
-              <td className="df-ratio-all">
-                {(sumArr(ratioNum) * 100).toFixed(0).toString()}
-              </td>
-            }
+            <td colSpan={2}>百分比(%)</td>
+            {stats.ratios.map((r, i) => (
+              <td key={i} className="df-ratio-num">{(r * 100).toFixed(0)}</td>
+            ))}
+            <td className="df-ratio-all">100</td>
           </tr>
           <tr className="acc-ratio">
-            <td colSpan="2">累計百分比</td>
-            {accRatioNum.map((e, i) => {
-              return (
-                <td key={`acc-ratio-${i}`} className="df-acc-num">
-                  {(e * 100).toFixed(0).toString()}
-                </td>
-              );
-            })}
-            {
-              <td className="df-acc-all">
-                {(accRatioNum[accRatioNum.length - 1] * 100)
-                  .toFixed(0)
-                  .toString()}
-              </td>
-            }
+            <td colSpan={2}>累計百分比</td>
+            {stats.accRatios.map((r, i) => (
+              <td key={i} className="df-acc-num">{(r * 100).toFixed(0)}</td>
+            ))}
+            <td className="df-acc-all">100</td>
           </tr>
         </tfoot>
       </table>

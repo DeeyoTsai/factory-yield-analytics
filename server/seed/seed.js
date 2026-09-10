@@ -44,7 +44,7 @@ async function seedUsers() {
 async function seedFma() {
   const rng = makeRng(777);
   const days = recentWeekdays(10);
-  const gids = [];
+  const gids = []; // [{ gid, line }] —— 交給 seedImages 讓 imagetb.line 對齊 outline
   let outlineCount = 0;
   let glassCount = 0;
 
@@ -52,8 +52,22 @@ async function seedFma() {
     const day = rng.pick(days);
     const line = rng.pick(LINES);
     const product = rng.pick(PRODUCTS);
-    const top3 = rng.shuffle(DEFECT_TYPES).slice(0, 3)
-      .map((d) => `${d.label}-${rng.int(10, 60)}`);
+    const top3full = rng.shuffle(DEFECT_TYPES).slice(0, 3);
+    const top3pct = top3full.map(() => rng.int(10, 60));
+    const top3 = top3full.map((d, k) => `${d.label}-${top3pct[k]}`);
+    const ACTIONS = [
+      "隔離待重工", "去膠槽液更新排程提前", "貼合段真空度待確認",
+      "曝光參數微調並追蹤", "搬運載具點檢", "顯影段噴嘴清潔",
+    ];
+    // 用 FMA 表單「調查結果整理」的可解析格式，讓查詢/編輯頁能還原前三大 defect + 對策
+    const comment =
+      `<調查結果整理>\n` +
+      `    1.${line}-${product}點數超過管制線，進行 ADI review ${rng.int(3, 8)}枚，` +
+      `平均總點數約${rng.int(3, 12)}點，結果如下:\n` +
+      `    2.主要Defect為\n` +
+      top3full
+        .map((d, k) => `    (${k + 1}) ${d.label}   佔${top3pct[k]}.0%-->${rng.pick(ACTIONS)}`)
+        .join("\n");
 
     const outline = await Outlines.create({
       emp: rng.pick(DEMO_USERS).employee,
@@ -61,13 +75,7 @@ async function seedFma() {
       lot: `LOT-${day.replace(/-/g, "").slice(2)}${pad(rng.int(1, 20))}`,
       first: top3[0], second: top3[1], third: top3[2],
       datetime: new Date(`${day}T${pad(rng.int(7, 20))}:${pad(rng.int(0, 59))}:00`),
-      comment: rng.pick([
-        "首件檢查，主要缺陷集中於上緣",
-        "整體良好，破損為搬運碰撞",
-        "顯影不良集中在同一 CST，隔離待重工",
-        "殘膠偏多，去膠槽液更新排程提前",
-        "氣泡比例上升，貼合段真空度待確認",
-      ]),
+      comment,
       drag_slots: null,
     });
     outlineCount += 1;
@@ -76,7 +84,7 @@ async function seedFma() {
     const rows = [];
     for (let g = 0; g < nGlass; g += 1) {
       const gid = `GL-${day.replace(/-/g, "").slice(2)}-${pad(rng.int(1, 999))}`;
-      gids.push(gid);
+      gids.push({ gid, line });
       const row = { date: day, gid, outlineId: outline.id, s: rng.int(0, 6), m: rng.int(0, 4), l: rng.int(0, 2), otherdf: [] };
       for (const key of DEFECT_KEYS) row[key] = rng.bool(0.35) ? rng.int(1, 6) : 0;
       rows.push(row);

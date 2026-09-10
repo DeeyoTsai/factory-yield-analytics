@@ -59,20 +59,19 @@ const DefectTableElement = (props) => {
       //   justifyContent: "center", // 水平置中（可選）
       // },
       // headerClass: "text-center",
-      valueGetter: (p) =>
-        new Date(
-          p.data.datetime.slice(0, 4) +
-            "-" +
-            p.data.datetime.slice(4, 6) +
-            "-" +
-            p.data.datetime.slice(6, 8) +
-            " " +
-            p.data.datetime.slice(8, 10) +
-            ":" +
-            p.data.datetime.slice(10, 12) +
-            ":" +
-            p.data.datetime.slice(12, 14)
-        ).toLocaleString(),
+      valueGetter: (p) => {
+        const dt = p.data?.datetime;
+        if (!dt) return "";
+        // 支援兩種格式：緊湊 14 碼 YYYYMMDDHHmmss，或已是可解析的日期字串
+        const digits = String(dt).replace(/\D/g, "");
+        const iso =
+          digits.length >= 14
+            ? `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)} ` +
+              `${digits.slice(8, 10)}:${digits.slice(10, 12)}:${digits.slice(12, 14)}`
+            : dt;
+        const d = new Date(iso);
+        return isNaN(d) ? String(dt) : d.toLocaleString();
+      },
     },
     {
       field: "gid",
@@ -118,18 +117,19 @@ const DefectTableElement = (props) => {
       //   justifyContent: "center", // 水平置中（可選）
       // },
       valueGetter: (p) => {
-        // predToDfType(p.data.pred_result);
-        const obj = JSON.parse(p.data.pred_result);
-        // console.log(obj);
-        // console.log(Object.values(obj));
-        let pd_result_str = "";
-        Object.values(obj).forEach((v, i) => {
-          const dfKey = labeledDefect[Object.keys(v)[0]];
-          pd_result_str += `${
-            transDefect[dfKey] ? transDefect[dfKey] : dfKey
-          },`;
-        });
-        return pd_result_str.slice(0, pd_result_str.length - 1);
+        // pred_result 契約：{ "detections": [ { class, confidence, bbox } ] }
+        try {
+          const obj = JSON.parse(p.data.pred_result || "{}");
+          const dets = Array.isArray(obj.detections) ? obj.detections : [];
+          return dets
+            .map((d) => {
+              const key = labeledDefect[d.class] || d.class;
+              return transDefect[key] || key;
+            })
+            .join(", ");
+        } catch (_) {
+          return "";
+        }
       },
     },
     {
@@ -253,81 +253,54 @@ const DefectTableElement = (props) => {
     // console.log(dfArrRef);
   }, [props.defectArr]);
 
-  useEffect(() => {
-    // console.log(props.glassDataSet);
-    if (props.glassDataSet) {
-      if (props.glassDataSet[0].gid.length > 10) {
-        let imgDataError = "";
-        const glasses = props.glassDataSet.map((e) => e.gid);
-        const selectLine = document.querySelector(".form-select").value;
-        // console.log(glasses);
-        const sendObj = { [selectLine]: glasses };
+  // 目前表格填的 glass id（由 parent 傳入，取代讀 DOM）
+  // 新增表單用 props.glassRows；查詢/編輯頁用 props.glassDataSet
+  const currentGids = () =>
+    (props.glassRows || props.glassDataSet || [])
+      .map((r) => String(r.gid || "").trim())
+      .filter((g) => g.length > 5);
 
-        const fetchData = async () => {
-          try {
-            const imgData = await ImageService.queryByGlasses(sendObj);
-            // console.log(imgData);
-            setRowData(imgData.data.foundData);
-            props.onImagesLoaded?.(imgData.data.foundData ?? []);
-          } catch (e) {
-            imgDataError = e.response.data.msg;
-            console.log(imgDataError);
-            // setMessage(imgDataError);
-            // messageRef.current = imgDataError;
-          }
-        };
-        fetchData();
-      }
-    }
-  }, [props.glassDataSet]);
-
-  const handleGetData = async () => {
-
-    let imgDataError = "";
-    const glassElements = document.querySelectorAll(".gid");
-    const selectLine = document.querySelector(".form-select").value;
-    const glasses = Array.from(glassElements)
-      .map((e) => e.textContent.replace(/\n/g, ""))
-      .filter((a) => a.length > 7);
-    const sendObj = { [selectLine]: glasses };
-    try {
-      // console.log(sendObj);
-
-      const imgData = await ImageService.queryByGlasses(sendObj);
-      console.log(imgData);
-      setRowData(imgData.data.foundData);
-      props.onImagesLoaded?.(imgData.data.foundData ?? []);
-
-      // 統計每張圖片第一筆 predict 結果，累計各 glass 的 defect 數
-      const predictMap = {};
-      (imgData.data.foundData ?? []).forEach((imgRecord) => {
-        const gid = imgRecord.gid;
-        if (!predictMap[gid]) predictMap[gid] = {};
-        if (imgRecord.pred_result) {
-          try {
-            const obj = JSON.parse(imgRecord.pred_result);
-            const firstDetection = Object.values(obj)[0];
-            if (firstDetection) {
-              const yoloClass = Object.keys(firstDetection)[0];
-              const dfField = labeledDefect[yoloClass];
-              if (dfField) {
-                predictMap[gid][dfField] = (predictMap[gid][dfField] || 0) + 1;
-              }
-            }
-          } catch (_) {}
+  // 從 imagetb 回應建 predictMap：{ gid: { <12類欄位 key>: count } }
+  const buildPredictMap = (records) => {
+    const predictMap = {};
+    (records || []).forEach((rec) => {
+      const gid = rec.gid;
+      if (!gid) return;
+      if (!predictMap[gid]) predictMap[gid] = {};
+      try {
+        const obj = JSON.parse(rec.pred_result || "{}");
+        const first = Array.isArray(obj.detections) ? obj.detections[0] : null;
+        if (first) {
+          const dfField = labeledDefect[first.class];
+          if (dfField) predictMap[gid][dfField] = (predictMap[gid][dfField] || 0) + 1;
         }
-      });
-      props.onPredictDataFetched?.(predictMap);
+      } catch (_) {}
+    });
+    return predictMap;
+  };
+
+  const fetchImages = async () => {
+    const glasses = currentGids();
+    if (glasses.length === 0) return;
+    let lotForProduct;
+    const sendObj = { [props.line || ""]: glasses };
+    try {
+      const imgData = await ImageService.queryByGlasses(sendObj);
+      const found = imgData.data.foundData ?? [];
+      lotForProduct = found.find((f) => f.lot)?.lot;
+      setRowData(found);
+      props.onImagesLoaded?.(found);
+      props.onPredictDataFetched?.(buildPredictMap(found));
     } catch (e) {
-      imgDataError = e.response.data.msg;
-      console.log(imgDataError);
+      console.log(e.response?.data?.msg || e.message);
       setRowData([]);
       props.onImagesLoaded?.([]);
       // setMessage(imgDataError);
       // messageRef.current = imgDataError;
     }
-    // 用lot搜尋eqAction資料庫取得Product Name
-    const lot = glasses[0]?.slice(0,7);
+    // 用 lot 查 EqAction 取得品名。優先用影像記錄自己的 lot 欄位；
+    // 沒有才退回「gid 前綴即 lot」的慣例（不同場域 glass id 編碼規則不一定相同）。
+    const lot = lotForProduct || glasses[0]?.slice(0, 7);
     try {
       const productObj = await ImageService.queryProductByLot(lot);
       // console.log(productObj);
@@ -362,8 +335,15 @@ const DefectTableElement = (props) => {
 
     }
 
-    // ImageService.queryByGlasses(glasses);
   };
+
+  // 查詢/編輯頁：glassDataSet 一到就自動抓影像
+  useEffect(() => {
+    if (Array.isArray(props.glassDataSet) && props.glassDataSet.length > 0) {
+      fetchImages();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.glassDataSet]);
 
   const handleDelete = useCallback(async () => {
     const selectedData = gridRef.current.api.getSelectedRows();
@@ -433,7 +413,7 @@ const DefectTableElement = (props) => {
         <button
           type="button"
           className="btn btn-warning p-2 m-1"
-          onClick={handleGetData}
+          onClick={fetchImages}
           disabled={props.editable}
         >
           Refresh

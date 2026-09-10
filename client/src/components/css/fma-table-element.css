@@ -22,15 +22,59 @@ a {
   color: white;
 }
 
+div.fma-result-input {
+  width: 100%;
+  overflow-x: auto;
+}
 div.fma-result-input table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
+div.fma-result-input table th,
+div.fma-result-input table td {
+  padding: 2px 3px;
+  overflow: hidden;
+}
+/* 受控輸入格：填滿整個 td，不要用瀏覽器預設寬度 */
+div.fma-result-input .fma-cell-input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: none;
+  background: transparent;
+  text-align: center;
+  font-size: 0.85rem;
+  padding: 2px 1px;
+}
+div.fma-result-input .fma-cell-input:focus {
+  outline: 1px solid #6c8ebf;
+  background: #fff;
+}
+/* 隱藏 number input 的上下箭頭，省空間 */
+div.fma-result-input .fma-cell-input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+div.fma-result-input .fma-cell-input[type="number"]::-webkit-outer-spin-button,
+div.fma-result-input .fma-cell-input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+/* 欄寬：非缺陷欄固定窄寬，缺陷欄平分剩餘 */
+div.fma-result-input table col.col-item { width: 2.2rem; }
+div.fma-result-input table col.col-gid { width: 8rem; }
+div.fma-result-input table col.col-cal { width: 2.6rem; }
+div.fma-result-input table col.col-total { width: 3.4rem; }
+div.fma-result-input table col.col-trash { width: 1.8rem; }
 div.fma-result-input table thead {
   background-color: rgb(203, 218, 224);
 }
 div.fma-result-input table thead tr th {
   border: 1px solid #272727;
+  font-size: 0.8rem;
+  line-height: 1.15;
+  word-break: break-word;
 }
 div.fma-result-input table thead tr th.df-cal {
   background-color: wheat;

@@ -29,6 +29,10 @@ class ImageService {
       }
     );
   }
+  // Demo 用：取幾個確定有影像的 glass id（接自己資料流後後端可移除，前端會自動不顯示）
+  demoGlasses(limit = 5) {
+    return axios.get(API_URL + `/demoGlasses`, { params: { limit } });
+  }
   notShowByImgTbID(id_list) {
     let token;
     if (localStorage.getItem("user")) {

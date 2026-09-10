@@ -7,7 +7,7 @@ const FmaTextareaElement = ({
   product,
   standardRowNum,
   sortedDfArr,
-  dfRatioForLine,
+  sortedRatios,
   smlAvg,
   editable,
   actionArr,
@@ -26,38 +26,38 @@ const FmaTextareaElement = ({
     ${
       commentDfArr && commentDfArr.length >= 1
         ? `(1) ${commentDfArr[0]}   佔${(
-            dfRatioForLine[0]?.toFixed(3) * 100
+            sortedRatios[0]?.toFixed(3) * 100
           ).toFixed(1)}%-->${actionArr[0] || "{action1}"}`
         : `(1) ${sortedDfArr[0]?.trim()}   佔${(
-            dfRatioForLine[0]?.toFixed(3) * 100
+            sortedRatios[0]?.toFixed(3) * 100
           ).toFixed(1)}%-->${actionArr[0] || "{action1}"}`
     }
     ${
       commentDfArr && commentDfArr.length >= 2 && commentDfArr[1] !== ""
         ? `(2) ${commentDfArr[1]}   佔${(
-            dfRatioForLine[1]?.toFixed(3) * 100
+            sortedRatios[1]?.toFixed(3) * 100
           ).toFixed(1)}%-->${actionArr[1] || "{action2}"}`
         : commentDfArr
           ? ""
           : `(2) ${sortedDfArr[1]?.trim()}   佔${(
-              dfRatioForLine[1]?.toFixed(3) * 100
+              sortedRatios[1]?.toFixed(3) * 100
             ).toFixed(1)}%-->${actionArr[1] || "{action2}"}`
     }
     ${
       commentDfArr && commentDfArr.length >= 3 && commentDfArr[2] !== ""
         ? `(3) ${commentDfArr[2]}   佔${(
-            dfRatioForLine[2]?.toFixed(3) * 100
+            sortedRatios[2]?.toFixed(3) * 100
           ).toFixed(1)}%-->${actionArr[2] || "{action3}"}`
         : commentDfArr
           ? ""
           : `(3) ${sortedDfArr[2]?.trim()}   佔${(
-              dfRatioForLine[2]?.toFixed(3) * 100
+              sortedRatios[2]?.toFixed(3) * 100
             ).toFixed(1)}%-->${actionArr[2] || "{action3}"}`
     }        
   `,
       );
     }
-  }, [line, product, standardRowNum, sortedDfArr, dfRatioForLine, smlAvg]);
+  }, [line, product, standardRowNum, sortedDfArr, sortedRatios, smlAvg]);
   // }, [postContent]);
 
   useEffect(() => {

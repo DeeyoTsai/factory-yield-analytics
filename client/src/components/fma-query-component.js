@@ -7,35 +7,17 @@ import { useAuth } from "../contexts/AuthContext";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import "./css/DatePickerStyles.css";
+import { DEFECT_TYPES } from "../config/defectTypes";
+
+// outline 的 first/second/third 可能存 key 或 code，統一轉成中文顯示名
+const transDefect = Object.fromEntries(
+  DEFECT_TYPES.flatMap((d) => [
+    [d.key, d.label],
+    [d.code, d.label],
+  ])
+);
 
 const FmaQueryComponent = () => {
-  const transDefect = {
-    runder: "R異物",
-    gunder: "G異物",
-    bunder: "B異物",
-    bmwp: "BM WP",
-    rwp: "R WP",
-    gwp: "G WP",
-    bwp: "B WP",
-    rgel: "R殘膠",
-    ggel: "G殘膠",
-    bgel: "B殘膠",
-    rdevabnormal: "R顯影不良",
-    gdevabnormal: "G顯影不良",
-    bdevabnormal: "B顯影不良",
-    rfiber: "R纖維",
-    gfiber: "G纖維",
-    bfiber: "B纖維",
-    bp: "BP",
-    bmdirty: "BM髒污",
-    repair: "修正痕",
-    abovep: "膜厚異常",
-    backdirty: "背汙",
-    dirty: "髒污",
-    ovendrop: "氣泡",
-    black: "黑色系",
-  };
-
   const navigate = useNavigate();
   const { state } = useLocation();
   const { currentUser } = useAuth();
