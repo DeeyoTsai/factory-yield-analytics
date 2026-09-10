@@ -50,10 +50,32 @@ const EdcRangeView = () => {
   const [viewMode, setViewMode] = useState('day'); // 'day' | 'night' | 'custom'
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(false);
+  // ── 第 2 層明細 state：全部來自 GET /api/edc/group/flagged（handleSelectGroup 內設定）──
+  // 後端 edcController.getGroupFlagged() 現組回應，這裡收到後原封不動傳給 EdcFlaggedPanel → EdcColumnTrendChart。
   const [selectedGroup, setSelectedGroup] = useState(null);
+  // groupSegments：分段 meta（給第 2 層頂部 Chip）。來源 edc_segments（model EdcSegment），
+  //   每列一段：{ id, segment_index, event_start, event_end, glass_count, boundary_reason, recipe,
+  //   max_range, max_range_column, over_spec }。ingestion adapter 整批 destroy-CASCADE 重建。
   const [groupSegments, setGroupSegments] = useState([]);
+  // flaggedGlass：段內離群邏輯挑出的「兇手基板」清單，一片一列。
+  //   主體來源 edc_flagged_glass（model EdcFlaggedGlass）：
+  //     { id, edc_segment_id, glass_id, event_datetime, station, machine, recipe,
+  //       column_name（哪一欄離群，例 Shot3_Final_RRY）, value（那格量測值）,
+  //       segment_median, segment_range, side（'max'偏上緣 / 'min'偏下緣） }
+  //   後端再 left-join edc_glass_comment（model EdcGlassComment，自然鍵
+  //     day+station+machine+glass_id+column_name，**匯入流程永不觸碰**）補上人工欄位 { confirmed, comment }。
+  //   用途：散點圖畫放大紅點 + 下方 EdcFlaggedGlassTable 可勾選確認並下 comment（PUT /api/edc/comment）。
   const [flaggedGlass, setFlaggedGlass] = useState([]);
+  // byColumn：逐欄位、逐段的完整序列，給散點圖用。key＝監控欄位名
+  //   `Shot{n}_Final_{FRX|FRY|FLX|FLY|RLX|RLY|RRX|RRY}`（只有這批有非零值的欄位會出現）。value：
+  //     { overSpec, groupMaxRange, segments: [{ segment_index, boundary_reason, recipe,
+  //       min, max, avg, median, range, overSpec, points: [{ glass_id, event_datetime, value }] }] }
+  //   資料表：min/max/avg/median/range 來自 edc_segments.stats（JSON 欄，一段一列）；
+  //   points 逐片 glass 來自 edc_glass_records（model EdcGlassRecord，一片一列，
+  //   欄位名同來源系統原始欄名）。兩表皆由 ingestion adapter 整批重建。
   const [byColumn, setByColumn] = useState({});
+  // outlierThreshold：後端 DEFAULT_CONFIG.outlierThreshold（預設 2），非資料表。
+  //   傳給散點圖當 threshold，畫每段管制上下限線 = 中位數 ± threshold。
   const [outlierThreshold, setOutlierThreshold] = useState(2);
 
   // 爬蟲執行狀態：改由這裡統一輪詢（原本 EdcCrawlTriggerButton.jsx 自己也輪詢一份，兩邊各查各的沒意義），

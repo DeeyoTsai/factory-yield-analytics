@@ -5,9 +5,10 @@
 //
 // 判斷順序（中位數為中心，h1=max−median、h2=median−min、閥值 T=outlierThreshold、
 // 接近比例 closenessRatio）：
-//   ① |h1-h2| < closenessRatio*全距（差距太接近，分不出兇手）→ max/min 兩枚都取
-//   ② 否則選贏家（h1、h2 較大的一端），若贏家 > T → 只取贏家那枚
-//   ③ 贏家也沒超過 T（贏家自己不夠顯著）→ 退回兩端都取
+//   (1) 產生候選端：① |h1-h2| < closenessRatio*全距（差距太接近，分不出兇手）→ max/min 兩端都列候選；
+//       ② 否則選贏家（h1、h2 較大的一端），贏家 > T → 只列贏家，否則兩端都列候選
+//   (2) 候選端過「管制線」：只有該端 h > T（確實超出中位數±T）才真的標記；管制線內的極值剔除
+//   (3) 保底：(2) 後全空 → 退回標 h 較大那一端一枚（tie 取 max），維持「超規格欄位必有兇手」
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -51,18 +52,28 @@ test('分支②：min 遠離、max 正常，差距夠大 → 只取 min 那枚',
   assert.equal(info.flagged[0].value, 4);
 });
 
-test('分支③：兩端對稱、差距為 0（完全分不出兇手）→ max/min 兩枚都取', () => {
-  // [8, 10×8, 12] → median=10, min=8, max=12, 全距=4, h1=2, h2=2，diff=0 < 0.3*4=1.2 → 太接近
+test('closeness + 保底：兩端對稱且都剛好貼在管制線上（h1=h2=T）→ 過濾後全空 → 保底標較遠端一枚（tie 取 max）', () => {
+  // [8, 10×8, 12] → median=10, min=8, max=12, 全距=4, h1=2, h2=2，diff=0 < 0.3*4=1.2 → closeness
+  //   候選=[max,min]；過管制線：h1=2 not>2、h2=2 not>2 → 全被剔除；保底：h1>=h2 → 取 max 一枚
+  //   （改版前是「兩端都標」，會讓貼著管制線的 min 也被標紅，故收斂成保底一枚）
   const { info, stat } = flaggedOf([8, 10, 10, 10, 10, 10, 10, 10, 10, 12]);
   assert.equal(stat.range, 4);
-  assert.equal(info.flagged.length, 2);
-  const sides = info.flagged.map((f) => f.side).sort();
-  assert.deepEqual(sides, ['max', 'min']);
-  const values = info.flagged.map((f) => f.value).sort((a, b) => a - b);
-  assert.deepEqual(values, [8, 12]);
+  assert.equal(info.flagged.length, 1);
+  assert.equal(info.flagged[0].side, 'max');
+  assert.equal(info.flagged[0].value, 12);
 });
 
-test('分支①/②的邊界情境：h1/h2 差距不算 0，但仍在 closenessRatio 範圍內（即使兩端都超過 T）→ 兩端都取', () => {
+test('closeness + 部分過濾：只有一端超過 T → 只標那一端（另一端在管制線內被剔除）', () => {
+  // [11, 13×8, 16] → median=13, min=11, max=16, 全距=5, h1=3, h2=2，diff=1 < 0.3*5=1.5 → closeness
+  //   候選=[max,min]；過管制線：h1=3>2 保留 max、h2=2 not>2 剔除 min → 只剩 max
+  const { info, stat } = flaggedOf([11, 13, 13, 13, 13, 13, 13, 13, 13, 16]);
+  assert.equal(stat.range, 5);
+  assert.equal(info.flagged.length, 1);
+  assert.equal(info.flagged[0].side, 'max');
+  assert.equal(info.flagged[0].value, 16);
+});
+
+test('分支①/②的邊界情境：h1/h2 差距不算 0，但仍在 closenessRatio 範圍內，且兩端都超過 T → 兩端都取', () => {
   // [10, 14×8, 17] → median=14, min=10, max=17, 全距=7, h1=3, h2=4，diff=1 < 0.3*7=2.1 → 太接近
   // h1=3>T=2、h2=4>T=2 兩端「各自看都超標」，但差距不夠大分不出誰是主兇手，故仍兩端都標
   const { info, stat } = flaggedOf([10, 14, 14, 14, 14, 14, 14, 14, 14, 17]);
@@ -72,12 +83,12 @@ test('分支①/②的邊界情境：h1/h2 差距不算 0，但仍在 closenessR
   assert.deepEqual(sides, ['max', 'min']);
 });
 
-test('分支③：差距明顯選出贏家，但贏家自己沒超過 T → 退回兩端都取', () => {
-  // 用自訂 config（rangeSpec=3）製造「贏家沒超過 T」的情境：
-  // 預設 rangeSpec=4 剛好等於 2*T，只要有明顯差距贏家必然 > T，此分支在預設值下不會發生，
-  // 屬於防呆——換成 rangeSpec=3 才能單獨驗證這條路徑。
+test('分支②贏家不顯著 + 保底（自訂 rangeSpec=3）：候選兩端都沒超過 T → 全被剔除 → 保底標 h 較大端一枚', () => {
+  // 預設 rangeSpec=4 剛好等於 2*T，有明顯差距時贏家必然 > T；換成 rangeSpec=3 才走得到
+  // 「贏家 <= T」這條路徑。
   // [9, 10×8, 12] → median=10, min=9, max=12, 全距=3, h1=2, h2=1，diff=1 >= 0.3*3=0.9 → 不接近
-  // 贏家 h1=2，未 > T=2 → 退回兩端都取
+  //   分支②贏家 h1=2 未 > T=2 → 候選=[max,min]；過管制線：h1=2 not>2、h2=1 not>2 → 全空；
+  //   保底：h1(2) >= h2(1) → 取 max 一枚（改版前是「兩端都取」，min=9 貼著中位數也被標紅）
   const rows = buildRows([9, 10, 10, 10, 10, 10, 10, 10, 10, 12]);
   const segs = analyzeEdcData(rows, { rangeSpec: 3 });
   assert.equal(segs.length, 1);
@@ -85,9 +96,9 @@ test('分支③：差距明顯選出贏家，但贏家自己沒超過 T → 退�
   const stat = segs[0].stats[COL];
   assert.equal(stat.range, 3);
   assert.ok(info, '全距=3 且自訂 rangeSpec=3 應該被標記');
-  assert.equal(info.flagged.length, 2);
-  const sides = info.flagged.map((f) => f.side).sort();
-  assert.deepEqual(sides, ['max', 'min']);
+  assert.equal(info.flagged.length, 1);
+  assert.equal(info.flagged[0].side, 'max');
+  assert.equal(info.flagged[0].value, 12);
 });
 
 test('門檻：全距 < rangeSpec(4) → 完全不標記', () => {

@@ -174,23 +174,37 @@ function analyzeSegment(segRows, monitorColumns, config) {
 
     if (range >= config.rangeSpec) {
       // 離群邏輯：中心點用中位數（非平均），避免離群值自己把中心拉歪。
-      // 恆等式 h1+h2=全距；T(outlierThreshold) 的語意＝「贏家一端要吃掉全距多少才算夠格當兇手」。
-      // 判斷順序：先看 h1/h2 差距是否太接近（分不出兇手→兩端都標），差距夠大才選贏家、
-      // 且贏家自己還要 > T 才單獨標記（贏家不夠顯著時退回兩端都標）。
+      // 恆等式 h1+h2=全距；T(outlierThreshold) 的語意＝「一端要離中位數多遠才算兇手」。
+      //
+      // 步驟：
+      //  (1) 先產生「候選端」——① h1/h2 差距太接近（<closenessRatio×全距）→ 分不出主兇手，
+      //      max/min 兩端都列候選；② 差距夠大 → 取較遠的一端（贏家），贏家 >T 就只列贏家，
+      //      否則兩端都列候選。
+      //  (2) 候選端再過「管制線」：只有該端自己 h > T（確實超出中位數±T）才真的標記。
+      //      全距達標、但分布其實很平均時，貼著管制線的極值不算異常、不標紅——
+      //      這是刻意的，避免圖上出現「紅點落在管制線內」的怪現象。
+      //  (3) 保底：(2) 過濾後若一端都不剩（只會在自訂 rangeSpec<2T、或全距剛好=rangeSpec
+      //      且分布完全對稱時發生），退回標「h 較大的那一端」一枚（tie 取 max），
+      //      維持「超規格欄位必定挑得出至少一個兇手」這個下游依賴的不變量。
       const h1 = max - med;
       const h2 = med - min;
       const maxRow = rowsWithValue.reduce((a, b) => (toNumber(b[col]) > toNumber(a[col]) ? b : a));
       const minRow = rowsWithValue.reduce((a, b) => (toNumber(b[col]) < toNumber(a[col]) ? b : a));
-      const both = [{ row: maxRow, side: 'max' }, { row: minRow, side: 'min' }];
+      const maxSide = { row: maxRow, side: 'max' };
+      const minSide = { row: minRow, side: 'min' };
 
-      let flagged;
+      let candidates;
       if (Math.abs(h1 - h2) < config.closenessRatio * range) {
-        flagged = both;
+        candidates = [maxSide, minSide];
       } else if (h1 > h2) {
-        flagged = h1 > config.outlierThreshold ? [{ row: maxRow, side: 'max' }] : both;
+        candidates = h1 > config.outlierThreshold ? [maxSide] : [maxSide, minSide];
       } else {
-        flagged = h2 > config.outlierThreshold ? [{ row: minRow, side: 'min' }] : both;
+        candidates = h2 > config.outlierThreshold ? [minSide] : [maxSide, minSide];
       }
+
+      const hOf = (f) => (f.side === 'max' ? h1 : h2);
+      let flagged = candidates.filter((f) => hOf(f) > config.outlierThreshold);
+      if (!flagged.length) flagged = [h1 >= h2 ? maxSide : minSide];
 
       flaggedByColumn[col] = {
         median: med,

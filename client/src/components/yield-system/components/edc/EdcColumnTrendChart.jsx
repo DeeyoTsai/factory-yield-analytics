@@ -163,9 +163,16 @@ function buildOption(column, segData, threshold, outlierGlassIds) {
         return `${row.glass_id}${tag}<br/>${row.event_datetime}<br/>值：${row.value}`;
       },
     },
-    grid: { left: 34, right: 8, top: 30, bottom: 8 },
+    grid: { left: 34, right: 8, top: 30, bottom: 30 },
     xAxis: { type: 'category', data: allPoints.map((_, i) => i), show: false },
     yAxis: { type: 'value', min: yLo - pad, max: yHi + pad * 1.6, axisLabel: { fontSize: 9 } },
+    // 資料量大時 showAllSymbol:'auto' 只畫得下少數藍點（折線與 hover 仍是完整的）。
+    // 加 dataZoom 讓使用者放大某區段時被藏的點自動浮現。filterMode:'none'＝只縮視窗、
+    // 不抽掉資料，markLine/markPoint 用的 category index 座標才不會位移。
+    dataZoom: [
+      { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
+      { type: 'slider', xAxisIndex: 0, filterMode: 'none', height: 16, bottom: 6, start: 0, end: 100 },
+    ],
     series: [...lineSeries, annotationSeries, outlierSeries],
   };
 }
@@ -174,6 +181,49 @@ function buildOption(column, segData, threshold, outlierGlassIds) {
 //  ①「全距>=4 異常 charts」：只列該站別品種有超規格紀錄的欄位（byColumn 的 overSpec===true），依 Shot 排序
 //  ② Shot 1~6：固定列出該 Shot 的 8 張角點 chart（FRX/FRY/FLX/FLY/RLX/RLY/RRX/RRY），不論是否超規格；
 //     若該欄位這批資料沒監控到（例如該 Shot 未曝光），顯示無資料佔位卡
+//
+// ── props 的來源與內容 ────────────────────────────────────────────────────────
+// 兩個都不是單一資料表，是後端 edcController.getGroupFlagged()（GET /api/edc/group/flagged）
+// 現組出來的，父層 EdcRangeView 收到後原封不動往下傳。
+//
+// byColumn：物件，key＝監控欄位名 `Shot{n}_Final_{FRX|FRY|FLX|FLY|RLX|RLY|RRX|RRY}`
+//   （只有「這批實際有非零值」的欄位會出現）。value 的形狀：
+//     {
+//       overSpec: boolean,        // 任一段全距 >= rangeSpec(4)
+//       groupMaxRange: number,    // 各段全距的最大值（圖下方那個粗體數字）
+//       segments: [{
+//         segment_index, boundary_reason('start'|'recipe'|'relogin'), recipe,
+//         min, max, avg, median, range,   // ← edc_segments.stats[欄位]（JSON 欄，一段一列）
+//         overSpec,                        // 該段 range >= 4
+//         points: [{ glass_id, event_datetime, value }]  // ← edc_glass_records，一片 glass 一列一點
+//       }]
+//     }
+//   相關資料表：
+//     - edc_segments（model EdcSegment）：分段統計，stats 是 { [欄位]:{min,max,avg,median,range} }
+//     - edc_glass_records（model EdcGlassRecord）：每片 glass 的原始量測值，欄位名與 EDC 原始欄名
+//       一字不差（Shot3_Final_FRY…），逐片落地成真欄位而非 JSON 陣列
+//   兩張表都由 ingestion adapter 每次整批 destroy-CASCADE 重建（見 domain/edcStore.js）。
+//
+// flaggedGlass：陣列，段內離群邏輯挑出的「兇手基板」，一片一列。每個元素：
+//     {
+//       id, edc_segment_id,
+//       glass_id, event_datetime, station, machine, recipe,
+//       column_name,      // 這片在哪一欄離群（例 Shot3_Final_RRY）
+//       value,            // 那一格的量測值
+//       segment_median, segment_range,   // 所屬分段的中位數 / 全距
+//       side,             // 'max'（偏上緣）/ 'min'（偏下緣）
+//       confirmed, comment   // ← 人工欄位，left-join edc_glass_comment 補上（見下）
+//     }
+//   相關資料表：
+//     - edc_flagged_glass（model EdcFlaggedGlass）：離群兇手明細，ingestion adapter 整批重建
+//     - edc_glass_comment（model EdcGlassComment）：user 的確認/註解，自然鍵
+//       (day,station,machine,glass_id,column_name)，**匯入流程永不觸碰**，重新匯入不會洗掉
+//   本元件只用它篩出「這一欄」的 glass_id 集合 → buildOption 把這些點畫成放大紅點；
+//   同一份 flaggedGlass 也給下方 EdcFlaggedGlassTable 當可勾選確認的清單。
+//
+// threshold：單一數字，後端 DEFAULT_CONFIG.outlierThreshold（預設 2），非資料表。
+//   用途：畫每段管制上下限線 = 中位數 ± threshold。
+// ─────────────────────────────────────────────────────────────────────────────
 const EdcColumnTrendChart = ({ byColumn = {}, flaggedGlass = [], threshold = 2 }) => {
   const [mode, setMode] = useState('flagged'); // 'flagged' | 1~6
 
@@ -183,6 +233,24 @@ const EdcColumnTrendChart = ({ byColumn = {}, flaggedGlass = [], threshold = 2 }
     }
     return SHOT_FIELD_ORDER.map((field) => `Shot${mode}_Final_${field}`);
   }, [byColumn, mode]);
+
+  // ⚠️ 一定要 memo：buildOption 內含多個 inline formatter 函式，每次呼叫都是新參考。
+  // echarts-for-react 以 deep-equal 比對 option（函式比參考、必不相等），不 memo 的話
+  // 父層 EdcRangeView 每 4 秒輪詢爬蟲狀態觸發的 re-render 都會被判定成「option 變了」→
+  // 重新 setOption(notMerge) → 使用者拉的 dataZoom 範圍被重置、畫面每 4 秒閃一次。
+  // 資料（byColumn/flaggedGlass/threshold/columns）沒變時，option 參考不變 → echarts 不重繪。
+  const optionByColumn = useMemo(() => {
+    const map = {};
+    for (const col of columns) {
+      const info = byColumn[col];
+      if (!info) continue;
+      const outlierGlassIds = new Set(
+        flaggedGlass.filter((f) => f.column_name === col).map((f) => f.glass_id)
+      );
+      map[col] = buildOption(col, info.segments || [], threshold, outlierGlassIds);
+    }
+    return map;
+  }, [columns, byColumn, flaggedGlass, threshold]);
 
   return (
     <div>
@@ -208,24 +276,21 @@ const EdcColumnTrendChart = ({ byColumn = {}, flaggedGlass = [], threshold = 2 }
             const info = byColumn[col];
             if (!info) {
               return (
-                <div key={col} className="col-12 col-md-6 col-lg-4">
+                <div key={col} className="col-12 col-md-6">
                   <div
                     className="border rounded p-1 d-flex align-items-center justify-content-center text-muted"
-                    style={{ height: 200, fontSize: 11 }}
+                    style={{ height: 260, fontSize: 11 }}
                   >
                     {col}：無資料
                   </div>
                 </div>
               );
             }
-            const outlierGlassIds = new Set(
-              flaggedGlass.filter((f) => f.column_name === col).map((f) => f.glass_id)
-            );
-            const option = buildOption(col, info.segments || [], threshold, outlierGlassIds);
+            const option = optionByColumn[col];
             return (
-              <div key={col} className="col-12 col-md-6 col-lg-4">
+              <div key={col} className="col-12 col-md-6">
                 <div className="border rounded p-1">
-                  <ReactECharts option={option} style={{ height: 200 }} notMerge />
+                  <ReactECharts option={option} style={{ height: 260 }} notMerge />
                   {/* 這是整張圖最該一眼看到的數字（判斷該欄位有沒有超規格），原本 10px 灰字太不起眼 */}
                   <div className="text-center" style={{ fontSize: 15, fontWeight: 700 }}>
                     <span className="text-muted" style={{ fontSize: 12, fontWeight: 600 }}>群組最大全距 </span>
