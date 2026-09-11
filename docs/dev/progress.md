@@ -176,6 +176,21 @@ Daily Yield 與未結批兩張 map 同一根因。
 **修法**：只改 seed 兩行 `× 1000`（`GlassInfo.xpos/ypos`、`unfinish_defect_details.x/y`），前端不動。
 `imagetb.xpos`（FMA Label 表格直接顯示）不改。單位契約已寫進 `docs/ingestion.md`「欄位單位與格式」。
 
+## Daily Yield / 未結批照片改用合成影像（2026-09-11）
+
+- `GlassInfo.img/img2` 與 `unfinish_defect_details.img_url_1/2` 原本指向 `picsum.photos` 隨機風景照，
+  跟 FMA 的合成 SVG 不一致、離線 clone 會破圖。改用 `renderPair()`：照片 1 = 原圖、照片 2 = 帶 bbox 預測圖，
+  缺陷類別由 `dfcode` 反查（`defectTypeOf()`）與該筆資料一致。`renderPair()` 加 `prefix` 參數
+  （`gi_` / `un_`）避免三處 glass id 撞名互相覆蓋；`resetOutDir()` 提到 `run()` 開頭
+- `defectImgSrc.js` 新增「`/` 開頭且無 `media`/`public` marker → 原樣回傳」分支，讓 `/demo-defects/xxx.svg`
+  不被切成跟著 SPA 路由變的 `./` 相對路徑。歷史 Linux 絕對路徑靠 marker 區分
+- **順手修掉一個從階段 1 就壞的測試**：`defectImgSrc.test.js` 第一案的 URL 在搬檔時被 `scrub.sed`
+  把內網 IP 整條換成 `javascript:void(0)`，測試從搬過來就沒跑過。改成合法外部 URL；client 測試 14/14
+- seed 後 `client/media/demo-defects/` 共 4,866 個 SVG、39MB（.gitignore 排除）
+
+**已知、未處理**：未結批 glass 的 ADI / Rework History 為空——seed 只替 Daily Yield 的 glass 建
+`AdiRecord` / `ReworkHis`，未結批 glass id 隨機、對不上。
+
 ## 下一步
 
 - [ ] **階段 5**：README（目前仍是 22 行「🚧 建置中」佔位）+ 架構圖 + CONTRIBUTING

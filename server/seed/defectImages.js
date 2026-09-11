@@ -200,10 +200,12 @@ function stamp(gid, idx) {
  * @param {number} idx            同一片 glass 的第幾張
  * @param {object} rng            seed/rng.js 的 rng
  * @param {object[]} defectTypes  這張圖上有哪些缺陷（1~2 個，展示單張多 detection）
+ * @param {string} [prefix=""]    檔名前綴。FMA 影像不加；Daily Yield / 未結批的 glass 可能與 FMA
+ *                                撞 gid，各自加 "gi_" / "un_" 避免互相覆蓋
  * @returns {{ ori: string, pred: string, detections: {class:string,confidence:number,bbox:number[]}[] }}
- *          ori/pred 為可直接放進 <img src> 的路徑
+ *          ori/pred 為可直接放進 <img src> 的根相對路徑（由 express.static(client/media) 服務）
  */
-function renderPair(gid, idx, rng, defectTypes) {
+function renderPair(gid, idx, rng, defectTypes, prefix = "") {
   const list = Array.isArray(defectTypes) ? defectTypes : [defectTypes];
   const bg = background(rng);
 
@@ -241,7 +243,7 @@ function renderPair(gid, idx, rng, defectTypes) {
     .join("");
   const predSvg = wrap(`${bg}${allMarks}${overlays}${stamp(gid, idx)}`);
 
-  const base = `${gid}_${idx}`;
+  const base = `${prefix}${gid}_${idx}`;
   fs.writeFileSync(path.join(OUT_DIR, `${base}_ori.svg`), oriSvg);
   fs.writeFileSync(path.join(OUT_DIR, `${base}_pred.svg`), predSvg);
 

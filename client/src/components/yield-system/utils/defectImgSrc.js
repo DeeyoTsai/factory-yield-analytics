@@ -2,7 +2,8 @@
 //
 // GlassInfo.img / img2 有兩種來源，同一張表裡新舊資料會並存：
 //   1. 外部影像伺服器的直連 URL（'http://...'），不下載到本機
-//   2. 之前的歷史資料：爬蟲存檔時的**本機絕對路徑**，含 Windows 反斜線
+//   2. 根相對路徑（'/demo-defects/...'）：server 的 express.static 直接服務，demo 合成影像
+//   3. 之前的歷史資料：爬蟲存檔時的**本機絕對路徑**，含 Windows 反斜線
 //      （圖片實體又曾從 client/public 搬到 client/media，所以 marker 有兩種）
 // 未結批（UnfinishDefectDetail.img_url_1/2）一律是第 1 種，可以直接用不必經過這裡。
 
@@ -22,9 +23,17 @@ export function resolveDefectImgSrc(raw) {
   // 否則 'http://...' 會被 split('public') 切爛。
   if (/^https?:\/\//i.test(v)) return v;
 
+  const normalized = v.replaceAll('\\', '/');
+  const hasMarker = normalized.includes('media') || normalized.includes('public');
+
+  // 根相對路徑（'/' 開頭、路徑裡沒有 media/public marker）：由 server 的 express.static
+  // 直接服務，原樣使用。demo 的合成瑕疵影像（/demo-defects/xxx.svg）就是這種；
+  // 不能走下面的 marker 切割，否則會被組成 './demo-defects/...' 這種跟著 SPA 路由變動的相對路徑。
+  // ⚠️ 歷史的 Linux 絕對路徑（/home/.../client/media/...）也是 '/' 開頭，靠「有 marker」區分。
+  if (normalized.startsWith('/') && !hasMarker) return v;
+
   // 歷史資料：取 media（新）或 public（舊）marker 之後的尾巴組相對 URL，
   // 由 server/index.js 的 express.static(client/media) + (client/public) 服務，DB 免 migration。
-  const normalized = v.replaceAll('\\', '/');
   const marker = normalized.includes('media') ? 'media' : 'public';
   const tail = normalized.split(marker)[1] || normalized;
 

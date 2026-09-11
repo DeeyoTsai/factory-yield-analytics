@@ -2,10 +2,17 @@ import { resolveDefectImgSrc } from './defectImgSrc';
 
 describe('resolveDefectImgSrc', () => {
   test('外部直連 URL 原樣回傳，不可被 media/public marker 切割', () => {
-    const url = 'javascript:void(0)';
+    const url = 'http://image-server.example.com:8888/IMAGE/2026/08/ABC123_1.jpg';
     expect(resolveDefectImgSrc(url)).toBe(url);
     expect(resolveDefectImgSrc('https://example.com/a/public/b.jpg'))
       .toBe('https://example.com/a/public/b.jpg');
+  });
+
+  test('根相對路徑（/ 開頭、由 express.static 直接服務）原樣回傳——demo 合成影像就是這種', () => {
+    expect(resolveDefectImgSrc('/demo-defects/gi_GL-260911-145_3_ori.svg'))
+      .toBe('/demo-defects/gi_GL-260911-145_3_ori.svg');
+    // 不可誤判成歷史路徑去切 marker：路徑裡沒有 media/public 也不能補 .jpg
+    expect(resolveDefectImgSrc('/images/2026/abc')).toBe('/images/2026/abc');
   });
 
   test('新的本機路徑（media marker）取尾巴組相對 URL', () => {

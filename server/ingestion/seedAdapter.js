@@ -45,6 +45,9 @@ function isoWeek(dayStr) {
 }
 const glassId = (day, i) => `GL-${day.replace(/-/g, "").slice(2)}-${pad(i)}`;
 const lotNo = (day, i) => `LOT-${day.replace(/-/g, "").slice(2)}${pad(i)}`;
+// dfcode 可能是 "L3-刮傷"（label）或 "DF-01"（code），反查回 DEFECT_TYPES 那一筆；找不到就隨機
+const defectTypeOf = (dfcode, rng) =>
+  DEFECT_TYPES.find((d) => dfcode.endsWith(d.label) || dfcode === d.code) || rng.pick(DEFECT_TYPES);
 
 // ── Daily Yield ───────────────────────────────────────────────────────────
 async function seedDailyYield(day, seedBase) {
@@ -108,8 +111,8 @@ async function seedDailyYield(day, seedBase) {
         gid, xpos: rng.int(0, 1300) * 1000, ypos: rng.int(0, 1100) * 1000,
         inspectstops: inspect, dfcode: rgb.dfcode, week: `W${isoWeek(day)}`,
         month: dayjs(day).month() + 1, firststop: firstStop,
-        img: `https://picsum.photos/seed/${gid}a/240/180`,
-        img2: `https://picsum.photos/seed/${gid}b/240/180`,
+        // 照片 1 = 原圖、照片 2 = 帶 bbox 的預測圖，缺陷類別與這筆 dfcode 一致
+        ...(() => { const im = renderPair(gid, g, rng, [defectTypeOf(rgb.dfcode, rng)], "gi_"); return { img: im.ori, img2: im.pred }; })(),
         rgbtopfive_id: rgb.id, pdamtable_id: pdam.id,
         ovenslot_id: oven.id, reworkhis_id: rework.id,
         adirecord_id: adi ? adi.id : null,
@@ -212,19 +215,23 @@ async function seedUnfinish(day, seedBase) {
     }));
     const detailsByCode = {};
     for (const d of defects.filter((x) => x.detail_code)) {
-      detailsByCode[d.detail_code] = Array.from({ length: rng.int(3, 10) }, (_, k) => ({
-        glassid: glassId(day, rng.int(1, 999)),
-        p_no: String(rng.int(1, 6)),
-        defect_name: d.defectcode,
-        x: String(rng.int(0, 1300) * 1000), y: String(rng.int(0, 1100) * 1000), // μm，同 GlassInfo
-        defect_group: `G${rng.int(1, 4)}`,
-        product: lotRow.product,
-        tedt: `${dayjs(day).format("YYYY/MM/DD")} ${pad(rng.int(8, 18))}:${pad(rng.int(0, 59))}`,
-        img_url_1: `https://picsum.photos/seed/unf${d.detail_code}${k}a/240/180`,
-        img_url_2: `https://picsum.photos/seed/unf${d.detail_code}${k}b/240/180`,
-        inspectstops: rng.shuffle(STATIONS_9).slice(0, 3).join(","),
-        firststop: rng.pick(STATIONS_9),
-      }));
+      detailsByCode[d.detail_code] = Array.from({ length: rng.int(3, 10) }, (_, k) => {
+        const glassid = glassId(day, rng.int(1, 999));
+        // 照片 1 = 原圖、照片 2 = 帶 bbox 的預測圖，缺陷類別與 defectcode 一致；檔名帶 glassid 對得上這一列
+        const im = renderPair(glassid, k, rng, [defectTypeOf(d.defectcode, rng)], `un_${d.detail_code}_`);
+        return {
+          glassid,
+          p_no: String(rng.int(1, 6)),
+          defect_name: d.defectcode,
+          x: String(rng.int(0, 1300) * 1000), y: String(rng.int(0, 1100) * 1000), // μm，同 GlassInfo
+          defect_group: `G${rng.int(1, 4)}`,
+          product: lotRow.product,
+          tedt: `${dayjs(day).format("YYYY/MM/DD")} ${pad(rng.int(8, 18))}:${pad(rng.int(0, 59))}`,
+          img_url_1: im.ori, img_url_2: im.pred,
+          inspectstops: rng.shuffle(STATIONS_9).slice(0, 3).join(","),
+          firststop: rng.pick(STATIONS_9),
+        };
+      });
     }
     const { defectIdByCode } = await replaceUnfinishLot({ lotRow, day, defects, detailsByCode });
 
@@ -290,8 +297,6 @@ async function seedImages(day, seedBase, gids) {
   const rows = [];
   const smlRows = [];
 
-  resetOutDir(); // 每次 seed 重畫，不累積舊檔
-
   const lineToAoi = (ln) => `AOI-0${ln.slice(1)}`;
 
   for (const entry of gids) {
@@ -339,6 +344,7 @@ async function seedImages(day, seedBase, gids) {
  * @type {import('./adapter').IngestionAdapter['run']}
  */
 async function run(opts = {}) {
+  resetOutDir(); // demo 影像每次 seed 重畫，不累積舊檔（Daily / 未結批 / FMA 三處都寫到同一個資料夾）
   const days = recentWeekdays(15);
   const result = { dailyYield: 0, unfinishLots: 0, edcRecords: 0, eqActions: 0, images: 0 };
 
