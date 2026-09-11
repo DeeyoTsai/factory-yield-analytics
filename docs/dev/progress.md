@@ -9,7 +9,7 @@
 - [x] `server/models/*`（25 個）搬移 + 去識別化
   - `fma-model.js`：24 個原缺陷欄位 → 12 個泛用欄位（由 defectTypes.js key 產生）
   - `AdiRecord` / `ReworkHis`：站別欄位 `r1..b2` → `l1..l6`（站別順序 BM1,BM2,L1..L6,AOI）
-  - 註解清理（外部影像伺服器 / 資料匯入 / 來源系統，取代 EIS / 爬蟲 / *.aspx）
+  - 註解清理（外部影像伺服器 / 資料匯入 / 來源系統，取代內部系統代號與頁面路徑）
   - `user-model.js`：department 長度放寬 [2,20]
 
 ## 進行中 / 待辦（階段 1）

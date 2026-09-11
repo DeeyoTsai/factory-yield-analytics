@@ -4,7 +4,7 @@ import {
   Dialog, DialogContent, Typography, Checkbox,
 } from '@mui/material';
 // 原本檔內自有的 Thumb 已抽成共用元件（daily 的 GlassTable 也要用同一個）。
-// 未結批的 img_url_1/2 本來就是 EIS 直連 URL，不需要 resolveDefectImgSrc() 正規化。
+// 未結批的 img_url_1/2 本來就是來源系統直連 URL，不需要 resolveDefectImgSrc() 正規化。
 import DefectThumb from '../DefectThumb';
 
 // 受控選取模式（同 dashboard/GlassTable）：checkbox 欄 + 表頭全選 + 點列切換，

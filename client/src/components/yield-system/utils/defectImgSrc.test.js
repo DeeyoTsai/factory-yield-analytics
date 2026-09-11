@@ -1,7 +1,7 @@
 import { resolveDefectImgSrc } from './defectImgSrc';
 
 describe('resolveDefectImgSrc', () => {
-  test('EIS 直連 URL 原樣回傳，不可被 media/public marker 切割', () => {
+  test('外部直連 URL 原樣回傳，不可被 media/public marker 切割', () => {
     const url = 'javascript:void(0)';
     expect(resolveDefectImgSrc(url)).toBe(url);
     expect(resolveDefectImgSrc('https://example.com/a/public/b.jpg'))

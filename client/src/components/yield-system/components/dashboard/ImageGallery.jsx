@@ -6,7 +6,7 @@ import {
   Typography,
   Box
 } from '@mui/material';
-// 原本這裡有一份自己的 changeUrl()，只認本機路徑。2026-08-15 起 GlassInfo.img 改存 EIS 直連 URL，
+// 原本這裡有一份自己的 changeUrl()，只認本機路徑。GlassInfo.img 可能存外部影像伺服器的直連 URL，
 // 舊版會把 'http://...' 拿去 split('public') 切爛而整片破圖 → 改用共用的 resolveDefectImgSrc()，
 // 它同時認 http URL（新資料）與 media/public 本機路徑（歷史資料）。
 import { resolveDefectImgSrc } from '../../utils/defectImgSrc';
@@ -91,7 +91,7 @@ const ImageGallery = ({ images }) => {
             }}
           > */}
             {/* src 原本會接 '?w=248&fit=crop&auto=format'（MUI 範例殘留的 Unsplash 參數），
-                對本機檔案沒作用，接在 EIS URL 後面反而有打壞 query string 的風險 → 移除 */}
+                對本機檔案沒作用，接在外部 URL 後面反而有打壞 query string 的風險 → 移除 */}
             <img
               src={src}
               alt={item.filename}

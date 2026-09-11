@@ -25,7 +25,8 @@ const authConfig = () => {
 };
 
 // 接自己場域時換成實際的來源明細頁 URL
-const EIS_DEFECT_URL = (lotno) => "#";
+// 來源系統的 lot defect 明細頁。接自己的資料流時把這裡換成你的 URL 產生器。
+const SOURCE_DETAIL_URL = (lotno) => "#";
 
 const UnfinishLotView = () => {
   const [selectedDate, setSelectedDate] = useState(dayjs());
@@ -207,7 +208,7 @@ const UnfinishLotView = () => {
                     <Table stickyHeader size="small">
                       <TableHead>
                         <TableRow>
-                          {['LOTNO','站別','O','OK','1DL','2DL','3DL','多丁','NG','LS','總計','投入','全良率','收率','品種','投入日','EIS'].map((h) => (
+                          {['LOTNO','站別','O','OK','1DL','2DL','3DL','多丁','NG','LS','總計','投入','全良率','收率','品種','投入日','來源'].map((h) => (
                             <TableCell key={h} sx={{ fontWeight: 'bold', whiteSpace: 'nowrap' }}>{h}</TableCell>
                           ))}
                         </TableRow>
@@ -226,7 +227,7 @@ const UnfinishLotView = () => {
                             <TableCell sx={{ fontWeight: 'bold' }}>{l.yield_rate}%</TableCell><TableCell>{l.recovery_rate}%</TableCell>
                             <TableCell>{l.product}</TableCell><TableCell>{l.input_date}</TableCell>
                             <TableCell>
-                              <Link href={EIS_DEFECT_URL(l.lotno)} target="_blank" rel="noreferrer"
+                              <Link href={SOURCE_DETAIL_URL(l.lotno)} target="_blank" rel="noreferrer"
                                 onClick={(e) => e.stopPropagation()}>明細</Link>
                             </TableCell>
                           </TableRow>
@@ -365,7 +366,7 @@ const UnfinishLotView = () => {
                     <div className="card-body text-center py-3">
                       <span className="text-muted">
                         {selectedDefect.defectcode} 未達明細爬取門檻（非排除類、數量≥10、前5大），
-                        可至 <Link href={EIS_DEFECT_URL(selectedLot.lotno)} target="_blank" rel="noreferrer">來源明細頁</Link> 查看
+                        可至 <Link href={SOURCE_DETAIL_URL(selectedLot.lotno)} target="_blank" rel="noreferrer">來源明細頁</Link> 查看
                       </span>
                     </div>
                   </div>

@@ -44,7 +44,7 @@ const getActionsForBin = (hourLabel, eqActions) => {
 
   if (Number.isNaN(binHour)) return [];
 
-  // EIS hours 陣列存 "MM/DD HH" 格式（無年份），EqAction 存 "YYYY/MM/DD HH:MM:SS"
+  // 來源系統的 hours 陣列存 "MM/DD HH" 格式（無年份），EqAction 存 "YYYY/MM/DD HH:MM:SS"
   // 統一轉成 Date 物件才能跨格式比對
   const getFullDate = (dateStr, hour = 0) => {
     if (dateStr.split('/').length === 2) {
