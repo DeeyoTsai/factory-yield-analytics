@@ -103,7 +103,9 @@ async function seedDailyYield(day, seedBase) {
       });
 
       await GlassInfo.create({
-        gid, xpos: rng.int(0, 1300), ypos: rng.int(0, 1100),
+        // 座標單位 μm（0~1,300,000 × 0~1,100,000）：前端 Defect Map 會 ÷1000 畫在 0~1300 / 0~1100 的軸上，
+        // 給 mm 級（0~1300）的話全部擠到零點角落、圖看起來是空的
+        gid, xpos: rng.int(0, 1300) * 1000, ypos: rng.int(0, 1100) * 1000,
         inspectstops: inspect, dfcode: rgb.dfcode, week: `W${isoWeek(day)}`,
         month: dayjs(day).month() + 1, firststop: firstStop,
         img: `https://picsum.photos/seed/${gid}a/240/180`,
@@ -214,7 +216,7 @@ async function seedUnfinish(day, seedBase) {
         glassid: glassId(day, rng.int(1, 999)),
         p_no: String(rng.int(1, 6)),
         defect_name: d.defectcode,
-        x: String(rng.int(0, 1300)), y: String(rng.int(0, 1100)),
+        x: String(rng.int(0, 1300) * 1000), y: String(rng.int(0, 1100) * 1000), // μm，同 GlassInfo
         defect_group: `G${rng.int(1, 4)}`,
         product: lotRow.product,
         tedt: `${dayjs(day).format("YYYY/MM/DD")} ${pad(rng.int(8, 18))}:${pad(rng.int(0, 59))}`,

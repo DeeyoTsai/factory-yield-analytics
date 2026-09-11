@@ -35,6 +35,19 @@ EDC 的分段 / 全距 / 離群分析是純函式（`server/domain/edcAnalysis.j
 
 ---
 
+## 欄位單位與格式（容易踩的坑）
+
+| 欄位 | 單位 / 格式 | 說明 |
+|---|---|---|
+| `GlassInfo.xpos` / `ypos`、`unfinish_defect_details.x` / `y` | **μm**（0 ~ 1,300,000 × 0 ~ 1,100,000） | 前端 Defect Map 會 **÷1000** 後畫在 0~1300 / 0~1100 mm 的軸上。給 mm 級的值會全部縮到零點角落，圖看起來是空的 |
+| `imagetb.xpos` / `ypos` | 任意（字串） | FMA 影像表格直接顯示，不換算 |
+| `EqAction.startend` | `YYYY-MM-DD 07:00 - YYYY-MM-DD 07:00` | 機況頁以此字串**精確比對**查詢，格式要一字不差 |
+| `EqAction.begintime` / `endtime` | `YYYY/MM/DD HH:mm:ss` | 甘特圖與趨勢圖 tooltip 用 |
+| `imagetb.pred_result` | JSON 字串 | 契約見下方「YOLO 影像」 |
+| `EdcGlassRecord` 的 `Shot{n}_Final_{FRX…}` | 數值 | 欄位名要與 `domain/edcAnalysis.js` 的 `MONITOR_COLUMN_RE` 相符才會被納入監控 |
+
+`seedAdapter.js` 就是照這張表產資料的，接自己資料流時可直接對照它的寫法。
+
 ## 三種常見的串接 pattern
 
 ### 1. 直連來源資料庫（最單純）

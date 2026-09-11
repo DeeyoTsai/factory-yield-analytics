@@ -73,8 +73,9 @@ and a **YOLO vision pipeline that classifies defect images and pre-fills the FMA
 
 ### Daily Yield 三層鑽取
 
-當日前五大缺陷 → 點一筆展開 Glass Details（每片 glass 的 X/Y、檢出站別、缺陷照片）、
-站別檢出分布、ADI / Rework 履歷、集中趨勢圖（產出／投入／異常率雙軸）、Oven Slot 分布。
+當日前五大缺陷 → 點一筆展開 Defect Map（缺陷在基板上的座標分布）、Glass Details（每片 glass 的
+X/Y、檢出站別、缺陷照片）、站別檢出分布、ADI / Rework 履歷、集中趨勢圖（產出／投入／異常率雙軸）、
+Oven Slot 分布。
 
 ![daily-yield](docs/images/03-daily-yield.png)
 
@@ -89,15 +90,19 @@ and a **YOLO vision pipeline that classifies defect images and pre-fills the FMA
 
 ![edc](docs/images/04-edc-spc.png)
 
-### 未結批良率 · 排程與機況甘特圖
+### 未結批良率三層鑽取
 
-還在製程中的 lot 也能看良率與缺陷分布（Lot 清單 → Defect 分布 → Glass 明細三層鑽取）；
-機況頁把每條產線的排程與設備事件畫成甘特圖。
+還在製程中的 lot 也能看良率與缺陷分布，不必等結批。Lot 清單（依全良率排序的長條 + 明細表）
+→ 點一個 lot 看 Defect 分布（藍色長條 = 達門檻可再鑽入）→ 點一根長條展開該 defect 的
+Glass Details、ADI / Rework 履歷、Defect Map、集中趨勢圖。
 
-<p float="left">
-  <img src="docs/images/05-unfinish.png" width="49%" />
-  <img src="docs/images/06-eq-gantt.png" width="49%" />
-</p>
+![unfinish](docs/images/05-unfinish.png)
+
+### 排程與機況甘特圖
+
+每條產線的排程與設備事件（DOWN / PM / HOLD / 調整…）畫成甘特圖，底部可拖拉縮放時間軸。
+
+![eq-gantt](docs/images/06-eq-gantt.png)
 
 ## 架構
 

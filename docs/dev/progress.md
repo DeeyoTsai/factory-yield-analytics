@@ -166,6 +166,16 @@ DragDropImageTable、AG-Grid YOLO 複判、FMA echart）(4) demo 不需跑 Pytho
 `**爬蟲永不觸碰**` → `**匯入流程永不觸碰**`、移除私有 repo 的歷史敘述（`2026-08-05 起取代…`）、
 `EDC 原始欄名` → `來源系統原始欄名`。私有 `CLAUDE.md` 不移植。
 
+## Defect Map 空白 bug（2026-09-11）
+
+**根因**：`seedAdapter.js` 座標給 mm 級（`rng.int(0, 1300)`），但前端 `UnfinishDefectMap` /
+`DefectScatterChart`（與私有版一字不差）會 **÷1000** 畫在 0~1300 / 0~1100 的軸上——來源系統給的是 μm
+（私有版 `firststop` 用 ±3000 容差比對也印證）。÷1000 後全部縮到零點角落，看起來是空圖。
+Daily Yield 與未結批兩張 map 同一根因。
+
+**修法**：只改 seed 兩行 `× 1000`（`GlassInfo.xpos/ypos`、`unfinish_defect_details.x/y`），前端不動。
+`imagetb.xpos`（FMA Label 表格直接顯示）不改。單位契約已寫進 `docs/ingestion.md`「欄位單位與格式」。
+
 ## 下一步
 
 - [ ] **階段 5**：README（目前仍是 22 行「🚧 建置中」佔位）+ 架構圖 + CONTRIBUTING
