@@ -56,7 +56,7 @@ server + client 端到端可跑的去識別化開源版本。public repo commit�
 
 - **`fma-table-element.js` 的表格仍是舊 24 欄硬編 `<td>`**——FMA 填表畫面能開但表格排版未對齊
   12 類 model。完整改成 12 欄動態表格 = 「YOLO × FMA 整合」階段的工作（設計文件 §4.3 也是這樣切）
-- `HourlyDefect` / `OverDefectDetail` model 保留（表照建），routes 不接，內容未去識別化
+- `HourlyDefect` / `OverDefectDetail` model 保留（表照建），routes 有掛（`/api/hourly-defects`、`/api/over-defect-details`）但 seed 未灌、前端未呼叫，等於死端點
 - ADI Analysis / 個人頁 / OverShoot 畫面
 - `RgbTopFive` model 名不改（"RGB" 非識別資訊，改名 = 大 cascade）
 - `stationProfile.js` 的 `STATION_ALIAS` / `others` 桶名（`Offline_AOI` / `Unknown` / `OC2` …）
@@ -191,10 +191,25 @@ Daily Yield 與未結批兩張 map 同一根因。
 **已知、未處理**：未結批 glass 的 ADI / Rework History 為空——seed 只替 Daily Yield 的 glass 建
 `AdiRecord` / `ReworkHis`，未結批 glass id 隨機、對不上。
 
+## 文件對齊 + 小殘件（2026-09-14）
+
+- 設計文件 `§3` 階段藍圖：階段 2 標完成、階段 3／4 標「已併入階段 1」（`seedAdapter.js` / `docs/ingestion.md`）、
+  階段 5／6 寫清楚剩餘子項；`§4.8` 階段 1 完成準則 7 框全勾，`phaseProcess` 測試一項改成實際的 3 支 25 項
+- 本檔「已知延後」`HourlyDefect` / `OverDefectDetail` 一行改成實況（routes 有掛但 seed 未灌、前端未呼叫）
+- `register-component.js`：移除教學範本殘留（註解掉的「身份 student / instructor」欄位）；
+  部門 placeholder 改成 `FQA / MFG / ENG`，對齊 `server/config/departments.js`（原本寫的 `QA` 不在清單裡）
+- CI `.github/workflows/deidentify-gate.yml` 新增 `domain-tests` job：`server/ npm run test:domain`
+  （純 `node:test`，不需 `npm ci`）
+- `.gitignore` 正式忽略維護者本機的 `CLAUDE.md`
+
 ## 下一步
 
-- [ ] **階段 5**：README（目前仍是 22 行「🚧 建置中」佔位）+ 架構圖 + CONTRIBUTING
+- [x] 階段 5：README（完整版含截圖、架構段，`89d113e`）
+- [ ] 階段 5：架構圖（README「架構」段只有文字，`docs/images/` 全是畫面截圖）
+- [ ] 階段 5：`CONTRIBUTING.md`
 - [ ] 階段 6：發佈設定（GitHub About / topics / 要不要 Pages）
+- [ ] `HourlyDefect` / `OverDefectDetail`：`server/index.js` 已掛 `/api/hourly-defects`、`/api/over-defect-details`，
+      但 seed 沒灌、前端零呼叫 → 拆掉或補 seed + 畫面，待決定
 
 ## 跨 PC 續作
 

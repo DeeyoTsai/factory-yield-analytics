@@ -49,13 +49,14 @@ repo：沿用現有 public repo `factory-yield-analytics`，**不帶任何私有
 |---|---|---|
 | **0** | 決策與邊界 | 本文件 §2 |
 | **1** | 新 repo 骨架：選檔搬移 + 去識別化 + 最小可運作前後端 + seed + 啟動 | 本文件 §4（已 grill） |
-| 2 | YOLO × Defect FMA 整合：detector 介面 + mock + Python 骨架 | 另開 grill → spec |
-| 3 | 良率／機況畫面：seed 假資料補齊 | 另開 grill → spec |
-| 4 | ingestion adapter 契約 + `docs/ingestion.md`（FTP／爬蟲／直連三 pattern） | 另開 grill → spec |
-| 5 | README + `docs/` + 架構圖 + 授權 + CI gate | 另開 grill → spec |
-| 6 | 發佈：GitHub Pages 文件站（如要）、topics、About | 另開 grill → spec |
+| 2 | YOLO × Defect FMA 整合：detector 介面 + mock + Python 骨架 | ✅ 完成（見 `progress.md`） |
+| 3 | 良率／機況畫面：seed 假資料補齊 | **已併入階段 1**（`server/ingestion/seedAdapter.js`） |
+| 4 | ingestion adapter 契約 + `docs/ingestion.md`（FTP／爬蟲／直連三 pattern） | **已併入階段 1**（`docs/ingestion.md`） |
+| 5 | README + `docs/` + 架構圖 + 授權 + CI gate | README／授權／CI gate 已完成；架構圖、CONTRIBUTING 未做 |
+| 6 | 發佈：GitHub Pages 文件站（如要）、topics、About | 未做 |
 
 phase 2–6 之後逐塊 grill；本文件先把 phase 1 定死。
+（2026-09-14 盤點：階段 3／4 在做階段 1 seed 時順手做完，沒有另開 spec。）
 
 ---
 
@@ -226,13 +227,16 @@ npm start                    # http://localhost:3000
 
 ### 4.8 階段 1 完成準則
 
-- [ ] `npm run seed && npm run dev` + `npm start` 後，核心子集 10 個畫面都能開、有資料
-- [ ] 登入頁「以 Demo 帳號登入」按鈕一鍵進站
-- [ ] Daily Yield / 未結批 / EDC 三層／二層鑽取點得下去（假資料）
-- [ ] `domain/*.test.js`（edcAnalysis / edcShift / phaseProcess / edcOutlier）全綠
-- [ ] 去識別化 grep gate 綠（本機 + CI）
-- [ ] 全 repo 無 `ftp_exchange_data` 參照、無 puppeteer/playwright/cheerio 依賴
-- [ ] YOLO 預填：FMA 填表頁按 Refresh 能把 mock `pred_result` 填進表格（完整深化留階段 2）
+- [x] `npm run seed && npm run dev` + `npm start` 後，核心子集 10 個畫面都能開、有資料
+- [x] 登入頁「以 Demo 帳號登入」按鈕一鍵進站
+- [x] Daily Yield / 未結批 / EDC 三層／二層鑽取點得下去（假資料）
+- [x] `domain/*.test.js`（edcAnalysis / edcShift / edcOutlier）全綠 —— 共 25 項；
+      `phaseProcess` 未搬（爬蟲耦合太深），故無對應測試
+- [x] 去識別化 grep gate 綠（本機 + CI）
+- [x] 全 repo 無 `ftp_exchange_data` 參照、無 puppeteer/playwright/cheerio 依賴
+- [x] YOLO 預填：FMA 填表頁按 Refresh 能把 mock `pred_result` 填進表格（階段 2 已完整深化為 12 欄受控表單）
+
+階段 1 於 `8e4002c` 完成，詳見 `progress.md`。
 
 ---
 

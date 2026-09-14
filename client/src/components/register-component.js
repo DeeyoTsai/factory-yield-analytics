@@ -59,7 +59,7 @@ const RegisterComponent = () => {
             type="text"
             className="form-control"
             name="department"
-            placeholder="部門代碼，例 QA / MFG / ENG"
+            placeholder="部門代碼，例 FQA / MFG / ENG（見 server/config/departments.js）"
           />
         </div>
         <br />
@@ -106,15 +106,6 @@ const RegisterComponent = () => {
           />
         </div>
 
-        {/* <div className="form-group">
-          <label htmlFor="password">身份：</label>
-          <input
-            type="text"
-            className="form-control"
-            placeholder="只能填入student或是instructor這兩個選項其一"
-            name="role"
-          />
-        </div> */}
         <br />
         <button onClick={handleRegister} className="btn btn-primary">
           <span>註冊帳號</span>

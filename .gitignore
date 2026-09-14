@@ -38,3 +38,6 @@ coverage/
 
 # CRA local env
 .env*.local
+
+# maintainer-local handover notes (contains private repo paths)
+CLAUDE.md
