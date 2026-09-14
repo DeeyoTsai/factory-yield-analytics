@@ -67,8 +67,6 @@ db.AllTopFive = require('./AllTopFive');
 db.Pdamtable = require('./Pdamtable');
 db.GlassInfo = require('./GlassInfo');
 db.EqAction = require('./EqAction');
-db.HourlyDefect = require('./HourlyDefect');
-db.OverDefectDetail = require('./OverDefectDetail');
 db.TrendChart = require('./TrendChart');
 db.UnfinishLot = require('./UnfinishLot');
 db.UnfinishDefect = require('./UnfinishDefect');
@@ -78,9 +76,5 @@ db.EdcSegment = require('./EdcSegment');
 db.EdcFlaggedGlass = require('./EdcFlaggedGlass');
 db.EdcGlassComment = require('./EdcGlassComment');
 db.EdcGlassRecord = require('./EdcGlassRecord');
-
-// Yield System Associations
-db.HourlyDefect.hasMany(db.OverDefectDetail, { foreignKey: 'hourlydefectId' });
-db.OverDefectDetail.belongsTo(db.HourlyDefect, { foreignKey: 'hourlydefectId' });
 
 module.exports = db;

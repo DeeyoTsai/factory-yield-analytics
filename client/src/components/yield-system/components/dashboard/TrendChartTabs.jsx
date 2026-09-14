@@ -3,7 +3,7 @@ import { Box, Tabs, Tab, Typography } from '@mui/material';
 import TrendChartMui from './TrendChartMui';
 
 // 集中趨勢圖的容器。同一個 defect 若兩條線（phase 1/2）都有發生，趨勢會有兩筆
-// （爬蟲 phaseProcess.js 的 derivePhaseProcesses），這裡用分頁籤切換。
+// （由匯入流程決定；內建 seed 只有單 phase），這裡用分頁籤切換。
 //
 // 為什麼是分頁籤而不是上下堆疊：卡片高度必須固定，才能跟同一列左邊的 Rework History
 // 對齊；堆疊會讓這張卡變兩倍高、整列底邊參差。

@@ -5,11 +5,11 @@ import { buildStationProfile, STATIONS } from '../../utils/stationProfile';
 // 站別檢出分布：取代原本的 Defect Images 卡片（照片已內嵌進 Glass Details 表格）。
 //
 // 這張圖的主要任務不是「再畫一次資料」，而是**驗證集中趨勢圖查的站別對不對**。
-// 趨勢圖的查詢站由爬蟲 xlsProcess() 推導：**顏色取自 dfcode 首字、完全不看站別資料**，
+// 趨勢圖的查詢站由匯入流程推導：**顏色取自 dfcode 首字、完全不看站別資料**，
 // 站別資料只決定線號。所以實際檢出最強的站可能根本不是趨勢圖查的那站
-// （Dave 實際遇過 G 檢出不少枚、趨勢圖卻查 B CTR）。
-// 線號自 2026-08-15 起改為「出現過的線號全部各查一次」（phaseProcess.js），
-// 不再只取眾數，所以 trendMetas 可能有兩筆。
+// （實務上遇過 G 檢出不少枚、趨勢圖卻查 B 站）。
+// 若匯入流程把「出現過的線號全部各查一次」，trendMetas 可能有兩筆；
+// 內建 seed 只產生單 phase（多 phase 趨勢見 README roadmap）。
 //
 // 刻意用純 CSS flexbox 而非 echarts：本圖是固定 9 列 + 每列多個標記（抽檢站符號、
 // 趨勢圖查詢站外框、rework 數字）的彙總，echarts 要靠 axisLabel rich text + markArea
@@ -150,7 +150,7 @@ const DefectStationProfile = ({ glassData = [], trendMetas = [], totalCount = nu
             {invalidTrends.length > 0 && (
               <Box component="span" sx={{ display: 'block', color: '#b91c1c' }}>
                 ⚠ 趨勢圖查詢站別「{invalidTrends.map((t) => t.process).join('、')}」不在標準站別清單中
-                {firstStopMode ? `（找不到帶線號的第一檢出站，退回用眾數「${firstStopMode}」的末字，見 phaseProcess.js）` : ''}
+                {firstStopMode ? `（找不到帶線號的第一檢出站，退回用眾數「${firstStopMode}」的末字）` : ''}
               </Box>
             )}
           </>

@@ -36,10 +36,8 @@ require("./config/passport")(passport);
 const routes = require("./routes");
 const rgbTopFiveRoutes = require("./routes/rgbTopFiveRoutes");
 const eqActionRoutes = require("./routes/eqActionRoutes");
-const hourlyDefectRoutes = require("./routes/hourlyDefectRoutes");
 const pdamtableRoutes = require("./routes/pdamtableRoutes");
 const glassInfoRoutes = require("./routes/glassInfoRoutes");
-const overDefectDetailRoutes = require("./routes/overDefectDetailRoutes");
 const trendChartRoutes = require("./routes/trendChartRoutes");
 const unfinishLotRoutes = require("./routes/unfinishLotRoutes");
 const edcRoutes = require("./routes/edcRoutes");
@@ -79,10 +77,8 @@ app.use("/api/imgtable", routes.imgtable); // 影像表：demo 開放，接自�
 
 app.use("/api", requireJwt, rgbTopFiveRoutes);
 app.use("/api/eq-actions", requireJwt, eqActionRoutes);
-app.use("/api/hourly-defects", requireJwt, hourlyDefectRoutes);
 app.use("/api/pdamtable", requireJwt, pdamtableRoutes);
 app.use("/api/glass-info", requireJwt, glassInfoRoutes);
-app.use("/api/over-defect-details", requireJwt, overDefectDetailRoutes);
 app.use("/api/trend-chart", requireJwt, trendChartRoutes);
 app.use("/api/unfinish-lot", requireJwt, unfinishLotRoutes);
 app.use("/api/edc", requireJwt, edcRoutes);

@@ -56,7 +56,7 @@ server + client 端到端可跑的去識別化開源版本。public repo commit�
 
 - **`fma-table-element.js` 的表格仍是舊 24 欄硬編 `<td>`**——FMA 填表畫面能開但表格排版未對齊
   12 類 model。完整改成 12 欄動態表格 = 「YOLO × FMA 整合」階段的工作（設計文件 §4.3 也是這樣切）
-- `HourlyDefect` / `OverDefectDetail` model 保留（表照建），routes 有掛（`/api/hourly-defects`、`/api/over-defect-details`）但 seed 未灌、前端未呼叫，等於死端點
+- ~~`HourlyDefect` / `OverDefectDetail` model 保留~~ → 2026-09-14 已拆除，見下方
 - ADI Analysis / 個人頁 / OverShoot 畫面
 - `RgbTopFive` model 名不改（"RGB" 非識別資訊，改名 = 大 cascade）
 - `stationProfile.js` 的 `STATION_ALIAS` / `others` 桶名（`Offline_AOI` / `Unknown` / `OC2` …）
@@ -202,14 +202,28 @@ Daily Yield 與未結批兩張 map 同一根因。
   （純 `node:test`，不需 `npm ci`）
 - `.gitignore` 正式忽略維護者本機的 `CLAUDE.md`
 
+## 拆除 HourlyDefect / OverDefectDetail 死端點（2026-09-14）
+
+- 刪 `models/HourlyDefect.js`、`models/OverDefectDetail.js`、`routes/hourlyDefectRoutes.js`、
+  `routes/overDefectDetailRoutes.js`、`controllers/hourlyDefectController.js`、`controllers/overDefectDetailController.js`；
+  `index.js` 拔 2 條路由、`models/index.js` 拔註冊與 hasMany 關聯。model 24 → 22 張（README 同步）
+- 注意：`sync({ force: true })` 只重建有註冊的 model，**既有本機 DB 的 `HourlyDefects` / `OverDefectDetails` 兩張孤兒表不會自動掉**，
+  要手動 `DROP TABLE`（全新 clone 不受影響）
+- **為什麼拆而不補**：私有版這兩個 model 本質是「快取來源系統算好的圖表 script」（`LONGTEXT` 裝 JSON blob），
+  不是資料模型；開源版若要做 ADI / OverShoot，會改成「結構化數據進 DB → domain 彙總 → API 出圖」重新設計，
+  現有殘留碼派不上用場。設計另開 grill
+- 前端 `DefectStationProfile.jsx` / `TrendChartTabs.jsx` 三處註解仍指向私有爬蟲 `phaseProcess.js` / `xlsProcess()`
+  與私有歷史日期 → 改成「匯入流程」措辭，並註明內建 seed 只有單 phase
+- README 新增「Roadmap」段：ADI hourly defect、OverShoot、多 phase 趨勢圖、個人頁
+
 ## 下一步
 
 - [x] 階段 5：README（完整版含截圖、架構段，`89d113e`）
 - [ ] 階段 5：架構圖（README「架構」段只有文字，`docs/images/` 全是畫面截圖）
 - [ ] 階段 5：`CONTRIBUTING.md`
 - [ ] 階段 6：發佈設定（GitHub About / topics / 要不要 Pages）
-- [ ] `HourlyDefect` / `OverDefectDetail`：`server/index.js` 已掛 `/api/hourly-defects`、`/api/over-defect-details`，
-      但 seed 沒灌、前端零呼叫 → 拆掉或補 seed + 畫面，待決定
+- [x] `HourlyDefect` / `OverDefectDetail` 死端點 → 已拆（見上）
+- [ ] ADI / OverShoot 重設計（結構化數據 → domain 彙總 → API）：另開 grill 寫 spec
 
 ## 跨 PC 續作
 

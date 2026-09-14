@@ -215,6 +215,16 @@ npm start                     # http://localhost:3000
 EDC 的 SPC 演算法（`server/domain/edcAnalysis.js` 的 `analyzeEdcData(rows)`）是純函式：
 把你的逐片量測列丟進去就得到分段與離群結果，不用重寫。
 
+## Roadmap
+
+私有版有、開源版**刻意未搬**的功能。原版資料流是抓來源系統現成的圖表 script 與網頁，
+開源版若要做，會改成「結構化數據進 DB → domain 層彙總 → API 出圖」的方式重新設計：
+
+- **ADI hourly defect 分析**：每小時／每站的缺陷數趨勢
+- **OverShoot 爆點基板明細**：超規缺陷的 glass 清單與缺陷圖
+- **多 phase 趨勢圖**：同一缺陷在 phase 1／2 兩條線都出現時，各查一條趨勢（目前 seed 只產生單 phase）
+- 個人頁（使用者自己的 FMA 紀錄）
+
 ## 專案結構
 
 ```
@@ -224,7 +234,7 @@ client/src/
   config/defectTypes.js  缺陷分類（與 server 同步）
 server/
   routes/ controllers/   REST API
-  models/                Sequelize models（24 張表）
+  models/                Sequelize models（22 張表）
   domain/                純函式演算法 + 測試（edcAnalysis · edcShift · edcStore · unfinishStore）
   ingestion/             adapter 契約 · seedAdapter · detector（YOLO 薄封裝）
   seed/                  合成資料 · SVG 瑕疵影像產生器
